@@ -3,7 +3,7 @@ import { Camera, Search, ShoppingCart, Loader2, ListOrdered, ArrowLeft } from 'l
 import Scanner from './components/Scanner';
 import ProductResult from './components/ProductResult';
 import ShoppingList, { type ShoppingListItem } from './components/ShoppingList';
-import { fetchProductInfo, getMockPrices, type ProductData, type SupermarketPrice } from './api';
+import { fetchProductInfo, getSupermarketPrices, type ProductData, type SupermarketPrice } from './api';
 
 function App() {
   const [scanning, setScanning] = useState(false);
@@ -27,16 +27,16 @@ function App() {
 
     async function loadData() {
       // Parallelize fetching product info and mock prices
-      const [prodInfo, mockPrices] = await Promise.all([
+      const [prodInfo, pricesData] = await Promise.all([
         fetchProductInfo(lastScannedCode!),
-        getMockPrices(lastScannedCode!)
+        getSupermarketPrices(lastScannedCode!)
       ]);
 
       if (!active) return;
       
       // If OFF API fails or doesn't find it, we create a generic placeholder
       setProduct(prodInfo || { code: lastScannedCode! });
-      setPrices(mockPrices);
+      setPrices(pricesData);
       setLoading(false);
     }
 
