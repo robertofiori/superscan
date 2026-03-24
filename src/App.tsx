@@ -11,10 +11,13 @@ function App() {
   const [listItems, setListItems] = useState<ShoppingListItem[]>([]);
   
   const [lastScannedCode, setLastScannedCode] = useState<string | null>(null);
+  const [manualCode, setManualCode] = useState('');
   
   const [loading, setLoading] = useState(false);
   const [product, setProduct] = useState<ProductData | null>(null);
   const [prices, setPrices] = useState<SupermarketPrice[]>([]);
+
+
 
   // Effect to fetch data when a code is scanned
   useEffect(() => {
@@ -27,15 +30,20 @@ function App() {
 
     async function loadData() {
       // Parallelize fetching product info and mock prices
+      const isBarcode = /^\d{7,14}$/.test(lastScannedCode!);
+
       const [prodInfo, pricesData] = await Promise.all([
-        fetchProductInfo(lastScannedCode!),
+        isBarcode ? fetchProductInfo(lastScannedCode!) : Promise.resolve(null),
         getSupermarketPrices(lastScannedCode!)
       ]);
 
       if (!active) return;
       
-      // If OFF API fails or doesn't find it, we create a generic placeholder
-      setProduct(prodInfo || { code: lastScannedCode! });
+      setProduct(prodInfo || { 
+        code: lastScannedCode!, 
+        product_name: isBarcode ? 'Producto Desconocido' : `Búsqueda: ${lastScannedCode!}`,
+        brands: isBarcode ? 'Marca no registrada' : 'Resultados sugeridos'
+      });
       setPrices(pricesData);
       setLoading(false);
     }
@@ -46,8 +54,8 @@ function App() {
   }, [lastScannedCode]);
 
   const handleScanSuccess = (code: string) => {
-    setLastScannedCode(code);
     setScanning(false);
+    setLastScannedCode(code);
   };
   
   const handleAddToList = (prod: ProductData, best: SupermarketPrice) => {
@@ -88,6 +96,7 @@ function App() {
             setShowList(false);
             setScanning(true);
           }}
+          onGoHome={() => setShowList(false)}
         />
       </div>
     );
@@ -119,24 +128,60 @@ function App() {
         
         {/* If NO product is being viewed and NOT loading, show Scanner Card */}
         {!lastScannedCode && !loading && (
-          <div className="bg-surface-light dark:bg-surface-dark rounded-[32px] p-8 text-center shadow-xl border border-slate-100 dark:border-slate-800 animate-in fade-in zoom-in-95 duration-300 mt-4">
-            <div className="w-24 h-24 bg-primary/10 text-primary rounded-[28px] rotate-3 flex items-center justify-center mx-auto mb-8 shadow-inner">
-              <Search size={44} strokeWidth={2.5} className="-rotate-3" />
-            </div>
-            <h2 className="text-3xl font-black mb-4 tracking-tight">Compara Precios</h2>
-            <p className="text-slate-500 text-base mb-10 leading-relaxed max-w-[280px] mx-auto">
-              Escanea cualquier código de barras y descubre qué supermercado lo tiene más barato hoy.
+          <div className="bg-surface-light dark:bg-surface-dark rounded-[32px] p-6 sm:p-8 text-center shadow-xl border border-slate-100 dark:border-slate-800 animate-in fade-in zoom-in-95 duration-300 mt-2">
+            
+            <h2 className="text-3xl font-black mb-2 tracking-tight">Buscar Producto</h2>
+            <p className="text-slate-500 text-sm mb-6 leading-relaxed max-w-[280px] mx-auto">
+              Ingresa el nombre del producto o su código de barras.
             </p>
             
+            <form 
+              onSubmit={async (e) => {
+                e.preventDefault();
+                const code = manualCode.trim();
+                if (!code) return;
+                
+                setLastScannedCode(code);
+                setManualCode('');
+              }}
+              className="flex w-full mb-8 relative"
+            >
+              <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
+                <Search size={18} className="text-slate-400" />
+              </div>
+              <input 
+                type="text" 
+                value={manualCode}
+                onChange={(e) => setManualCode(e.target.value)}
+                placeholder="Ej. Aceite Natura, Leche..." 
+                className="w-full bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white border-2 border-transparent focus:border-primary rounded-2xl py-4 pl-12 pr-4 font-medium outline-none transition-all placeholder:text-slate-400"
+              />
+              <button 
+                type="submit"
+                disabled={!manualCode.trim()}
+                className="absolute inset-y-2 right-2 bg-primary hover:bg-violet-600 active:scale-95 text-white disabled:opacity-50 font-bold px-4 rounded-xl transition-all shadow-md"
+              >
+                Ir
+              </button>
+            </form>
+
+            <div className="relative flex items-center w-full mb-6">
+              <div className="flex-grow border-t border-slate-200 dark:border-slate-700"></div>
+              <span className="flex-shrink-0 px-4 text-slate-400 text-sm font-medium">o usar tu cámara</span>
+              <div className="flex-grow border-t border-slate-200 dark:border-slate-700"></div>
+            </div>
+
             <button 
               onClick={() => setScanning(true)}
-              className="w-full bg-primary hover:bg-violet-600 text-white font-bold flex flex-row items-center justify-center gap-3 py-5 px-6 rounded-2xl shadow-xl shadow-primary/25 transition-all active:scale-95"
+              className="w-full bg-slate-900 dark:bg-white hover:bg-black dark:hover:bg-slate-200 text-white dark:text-slate-900 font-bold flex flex-row items-center justify-center gap-3 py-4 md:py-5 px-6 rounded-2xl shadow-xl transition-all active:scale-95"
             >
               <Camera size={24} />
               <span className="text-lg">Escanear Producto</span>
             </button>
           </div>
         )}
+
+
 
         {/* LOADING STATE */}
         {loading && (
