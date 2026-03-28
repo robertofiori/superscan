@@ -63,8 +63,13 @@ export async function getSupermarketPrices(query: string): Promise<SupermarketPr
       }));
 
 
-    // Ordenar de más barato a más caro
-    return validPrices.sort((a, b) => a.price - b.price);
+    // Ordenar: primero los que tienen stock y precio > 0, de más barato a más caro.
+    // Los que no tienen stock o precio 0 van al final.
+    return validPrices.sort((a, b) => {
+      if (a.inStock && a.price > 0 && (!b.inStock || b.price === 0)) return -1;
+      if (b.inStock && b.price > 0 && (!a.inStock || a.price === 0)) return 1;
+      return a.price - b.price;
+    });
   } catch (error) {
     console.error("Error fetching real prices from Firebase:", error);
     return [];
@@ -98,5 +103,39 @@ export async function fetchSearchSuggestions(query: string, type?: string, size?
   } catch (error) {
     console.error("Error fetching suggestions from Firebase:", error);
     return null;
+  }
+}
+
+export async function fetchDailyOffers(): Promise<SupermarketPrice[]> {
+  const categories = ['aceite', 'leche', 'arroz', 'fideos', 'limpieza'];
+  
+  try {
+    // Fetch prices for a set of common categories concurrently
+    const searchResults = await Promise.all(
+      categories.map(cat => getSupermarketPrices(cat))
+    );
+
+    // Flatten results and filter only items with offers and stock
+    const allOffers = searchResults
+      .flat()
+      .filter(p => p.isOffer && p.inStock && p.price > 0 && p.imageUrl);
+
+    // Deduplicate by productName (approximate) and shuffle
+    const uniqueOffersMap = new Map<string, SupermarketPrice>();
+    allOffers.forEach(o => {
+      const key = `${o.productName?.substring(0, 20)}-${o.supermarket}`;
+      if (!uniqueOffersMap.has(key)) {
+        uniqueOffersMap.set(key, o);
+      }
+    });
+
+    // Return a random selection of up to 12 offers
+    return Array.from(uniqueOffersMap.values())
+      .sort(() => Math.random() - 0.5)
+      .slice(0, 12);
+      
+  } catch (error) {
+    console.error("Error fetching daily offers:", error);
+    return [];
   }
 }

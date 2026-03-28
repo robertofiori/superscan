@@ -68,7 +68,7 @@ async function fetchVtex(storeName: string, domain: string, query: string) {
   }];
 }
 
-async function fetchCoope(query: string) {
+async function fetchCoope(query: string, isRetry = false): Promise<any[]> {
   try {
     const url = "https://us-central1-elchango-81e77.cloudfunctions.net/scrapeCoope";
     const { data } = await axios.post(url, { data: { query: query } }, { timeout: 45000 });
@@ -80,13 +80,21 @@ async function fetchCoope(query: string) {
         name: "Cooperativa Obrera",
         price: p.price,
         inStock: p.stock,
-        url: p.url || `https://www.lacoopeencasa.coop/sucursales/bahia-blanca/buscar?b=${encodeURIComponent(query)}`,
+        url: p.url || `https://www.lacoopeencasa.coop/sucursales/bahia-blanca/buscar?b=${encodeURIComponent(p.name || query)}`,
         originalPrice: p.originalPrice || 0,
         isOffer: !!p.isOffer,
-        imageUrl: p.imageUrl || '',
+        imageUrl: p.imageUrl || p.image || '',
         productName: p.name || 'Producto en La Coope',
         brand: p.brand || ''
       }));
+    } else if (!isRetry) {
+      // Si falla, intentamos con una versión más corta de la búsqueda (primeros 3 términos)
+      const words = query.trim().split(/\s+/);
+      if (words.length > 3) {
+        const simplifiedQuery = words.slice(0, 3).join(' ');
+        logger.info(`[Coope] Reintentando búsqueda simplificada: ${simplifiedQuery}`);
+        return fetchCoope(simplifiedQuery, true);
+      }
     }
   } catch (error: any) {
      logger.error("[Cooperativa Obrera] Error calling external Cloud Function:", error.message);
