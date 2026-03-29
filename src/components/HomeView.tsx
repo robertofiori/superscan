@@ -90,29 +90,29 @@ const HomeView: React.FC<HomeViewProps> = ({ onSearch, onScan, onViewChange }) =
           {/* Top Block: Logo and ¡Ahorra en tu compra */}
           <div className="flex items-center gap-0 sm:gap-1">
             {/* Logo */}
-            <div className="w-[130px] sm:w-[160px] shrink-0 relative z-10 transition-all duration-300 -mr-2 sm:-mr-4">
+            <div className="w-[100px] min-[400px]:w-[130px] sm:w-[160px] shrink-0 relative z-10 transition-all duration-300 -mr-2 sm:-mr-4">
               <img
                 src="Elmango logo.svg"
                 alt="ElMango Logo"
-                className="w-full h-auto object-contain drop-shadow-md scale-[1.5] sm:scale-[1.6] origin-right"
+                className="w-full h-auto object-contain drop-shadow-md scale-[1.4] min-[400px]:scale-[1.5] sm:scale-[1.6] origin-right"
               />
             </div>
             {/* Text */}
             <div className="flex flex-col pt-1">
               <span
-                className="text-[50px] sm:text-[62px] leading-[0.85] tracking-tight text-slate-950"
+                className="text-[40px] min-[400px]:text-[50px] sm:text-[62px] leading-[0.85] tracking-tight text-slate-950"
                 style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 900 }}
               >
                 ¡Ahorra
               </span>
               <span
-                className="text-[50px] sm:text-[62px] leading-[0.85] tracking-tight text-slate-950"
+                className="text-[40px] min-[400px]:text-[50px] sm:text-[62px] leading-[0.85] tracking-tight text-slate-950"
                 style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 900 }}
               >
                 en tu
               </span>
               <span
-                className="text-[50px] sm:text-[62px] leading-[0.85] tracking-tight text-slate-950"
+                className="text-[40px] min-[400px]:text-[50px] sm:text-[62px] leading-[0.85] tracking-tight text-slate-950"
                 style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 900 }}
               >
                 compra
@@ -123,7 +123,7 @@ const HomeView: React.FC<HomeViewProps> = ({ onSearch, onScan, onViewChange }) =
           {/* Bottom Block: realmente! and squiggly */}
           <div className="flex flex-col w-full relative -mt-1 sm:-mt-2 mb-8 items-center sm:items-start pl-2">
             <span
-              className="text-[64px] sm:text-[80px] leading-[0.85] tracking-tighter text-primary-green relative z-20"
+              className="text-[52px] min-[400px]:text-[64px] sm:text-[80px] leading-[0.85] tracking-tighter text-primary-green relative z-20"
               style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 900, fontStyle: "italic" }}
             >
               realmente<span className="text-slate-950">!</span>

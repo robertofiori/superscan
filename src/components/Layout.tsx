@@ -28,7 +28,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeView, onViewChange, car
         {/* Centro (Logo) */}
         <div className="flex-shrink-0 cursor-pointer absolute left-1/2 -translate-x-1/2 flex justify-center items-center pt-2" onClick={() => onViewChange('home')}>
           <img
-            src="/header-logo.svg"
+            src={`${import.meta.env.BASE_URL}header-logo.svg`}
             alt="ElMango"
             className="h-10 object-contain scale-[2.0] drop-shadow-sm"
             onError={(e) => {

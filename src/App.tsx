@@ -6,10 +6,11 @@ import ListView from './components/ListView';
 import ProfileView from './components/ProfileView';
 import Scanner from './components/Scanner';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
-import { fetchProductInfo, getSupermarketPrices, type ProductData, type SupermarketPrice } from './api';
+import { fetchProductInfo, getSupermarketPrices, type ProductData, type SupermarketPrice, type ShoppingListItem } from './api';
 import { AlertCircle, RefreshCw } from 'lucide-react';
 import { LandingScreen, LoginScreen } from './components/AuthScreens';
-import React from 'react';
+import { fetchUserList, saveUserList } from './services/listService';
+import React, { useRef } from 'react';
 
 // Simple Error Boundary to catch rendering crashes
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean, error: Error | null }> {
@@ -55,11 +56,7 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
   }
 }
 
-export interface ShoppingListItem {
-  product: ProductData;
-  price: SupermarketPrice;
-  quantity: number;
-}
+
 
 const AppContent = () => {
   const { user, loading: authLoading } = useAuth();
@@ -74,6 +71,37 @@ const AppContent = () => {
   const [prices, setPrices] = useState<SupermarketPrice[]>([]);
 
   const [profileInitialTab, setProfileInitialTab] = useState<'settings' | 'payments'>('settings');
+  const isInitialLoad = useRef(true);
+
+  // Cargar lista desde Firestore al iniciar sesión
+  useEffect(() => {
+    if (!user) {
+      setListItems([]);
+      isInitialLoad.current = true;
+      return;
+    }
+
+    const loadList = async () => {
+      const savedList = await fetchUserList(user.uid);
+      if (savedList && savedList.length >= 0) {
+        setListItems(savedList);
+      }
+      isInitialLoad.current = false;
+    };
+
+    loadList();
+  }, [user]);
+
+  // Guardar lista en Firestore ante cualquier cambio
+  useEffect(() => {
+    if (!user || isInitialLoad.current) return;
+
+    const timeoutId = setTimeout(() => {
+      saveUserList(user.uid, listItems);
+    }, 1000); // Debounce de 1 segundo
+
+    return () => clearTimeout(timeoutId);
+  }, [listItems, user]);
 
   const handleViewChange = (view: string, tab?: 'settings' | 'payments') => {
     if (tab) setProfileInitialTab(tab);

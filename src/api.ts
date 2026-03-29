@@ -139,3 +139,9 @@ export async function fetchDailyOffers(): Promise<SupermarketPrice[]> {
     return [];
   }
 }
+
+export interface ShoppingListItem {
+  product: ProductData;
+  price: SupermarketPrice;
+  quantity: number;
+}

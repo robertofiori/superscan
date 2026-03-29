@@ -1,5 +1,5 @@
 import { ShoppingBasket, Trash2, Plus, Minus, Share2, Calculator, ExternalLink, Download } from 'lucide-react';
-import { type ShoppingListItem } from '../App';
+import { type ShoppingListItem } from '../api';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
@@ -54,31 +54,64 @@ const ListView: React.FC<ListViewProps> = ({ items, onUpdateQuantity, onClear })
     doc.text('Tu lista de compras optimizada - Bahía Blanca', 14, 26);
     doc.text(`Fecha: ${new Date().toLocaleDateString()}`, 150, 20);
 
-    const tableData = items.map(item => [
-      String(item.price.productName || item.product.product_name || 'Producto'),
-      String(item.quantity || 1),
-      `$${(item.price.price || 0).toLocaleString('es-AR')}`,
-      String(item.price.supermarket || 'Distribuidora'),
-      `$${((item.price.price || 0) * (item.quantity || 1)).toLocaleString('es-AR')}`
-    ]);
+    let currentY = 35;
 
-    autoTable(doc, {
-      startY: 35,
-      head: [['Producto', 'Cant.', 'P. Unit', 'Supermercado', 'Subtotal']],
-      body: tableData,
-      theme: 'grid',
-      headStyles: { fillColor: [34, 197, 94], textColor: [255, 255, 255], fontStyle: 'bold' },
-      foot: [[
-        { content: 'TOTAL GENERAL', colSpan: 4, styles: { halign: 'right', fontStyle: 'bold' } },
-        { content: `$${total.toLocaleString('es-AR')}`, styles: { fontStyle: 'bold' } }
-      ]],
-      footStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42] }
+    Object.entries(grouped).forEach(([store, storeItems]) => {
+      // Check if we need a new page for the store title
+      if (currentY > 250) {
+        doc.addPage();
+        currentY = 20;
+      }
+
+      // Store Title
+      doc.setFontSize(14);
+      doc.setTextColor(15, 23, 42); // slate-900
+      doc.text(store.toUpperCase(), 14, currentY);
+      currentY += 5;
+
+      const storeTableData = storeItems.map(item => [
+        String(item.price.productName || item.product.product_name || 'Producto'),
+        String(item.quantity || 1),
+        `$${(item.price.price || 0).toLocaleString('es-AR')}`,
+        String(item.price.supermarket || 'Distribuidora'),
+        `$${((item.price.price || 0) * (item.quantity || 1)).toLocaleString('es-AR')}`
+      ]);
+
+      const storeTotal = storeItems.reduce((sum, item) => sum + item.price.price * item.quantity, 0);
+
+      autoTable(doc, {
+        startY: currentY,
+        head: [['Producto', 'Cant.', 'P. Unit', 'Supermercado', 'Subtotal']],
+        body: storeTableData,
+        theme: 'grid',
+        headStyles: { fillColor: [34, 197, 94], textColor: [255, 255, 255], fontStyle: 'bold' },
+        foot: [[
+          { content: `SUBTOTAL ${store.toUpperCase()}`, colSpan: 4, styles: { halign: 'right', fontStyle: 'bold' } },
+          { content: `$${storeTotal.toLocaleString('es-AR')}`, styles: { fontStyle: 'bold' } }
+        ]],
+        footStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42] }
+      });
+
+      currentY = (doc as any).lastAutoTable.finalY + 15;
     });
 
-    const finalY = (doc as any).lastAutoTable.finalY + 10;
+    // Final Summary
+    if (currentY > 260) {
+      doc.addPage();
+      currentY = 20;
+    }
+
+    doc.setFontSize(14);
+    doc.setTextColor(15, 23, 42);
+    doc.text('RESUMEN DE AHORRO', 14, currentY);
+    currentY += 8;
+
     doc.setFontSize(12);
+    doc.setTextColor(15, 23, 42);
+    doc.text(`TOTAL GENERAL: $${total.toLocaleString('es-AR')}`, 14, currentY);
+    currentY += 7;
     doc.setTextColor(34, 197, 94);
-    doc.text(`Ahorro Estimado: $${estimatedSavings.toLocaleString('es-AR')}`, 14, finalY);
+    doc.text(`Ahorro Estimado: $${estimatedSavings.toLocaleString('es-AR')}`, 14, currentY);
     
     doc.save('Mi-Lista-ElMango.pdf');
   };
