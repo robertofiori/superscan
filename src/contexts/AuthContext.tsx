@@ -3,10 +3,18 @@ import { onAuthStateChanged, signInWithPopup, signOut, type User } from 'firebas
 import { auth, googleProvider, db } from '../firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 
+interface LocationData {
+  id: string;
+  city: string;
+  province: string;
+  zipCode: string;
+}
+
 interface UserData {
   paymentMethods: string[];
   notifications: boolean;
   avatarUrl?: string;
+  location?: LocationData;
 }
 
 interface AuthContextType {
@@ -40,7 +48,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const initialData: UserData = {
             paymentMethods: [],
             notifications: true,
-            avatarUrl: user.photoURL || undefined
+            avatarUrl: user.photoURL || undefined,
+            location: {
+              id: 'bhi',
+              city: 'Bahía Blanca',
+              province: 'Buenos Aires',
+              zipCode: '8000'
+            }
           };
           await setDoc(docRef, initialData);
           setUserData(initialData);

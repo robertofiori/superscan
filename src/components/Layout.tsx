@@ -1,4 +1,5 @@
 import { Search, Tag, ListOrdered, User } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -8,6 +9,8 @@ interface LayoutProps {
 }
 
 const Layout: React.FC<LayoutProps> = ({ children, activeView, onViewChange, cartCount }) => {
+  const { user, userData } = useAuth();
+  const avatarUrl = userData?.avatarUrl || user?.photoURL;
   return (
     <div className="min-h-screen pb-20 bg-background-soft text-text-dark font-sans">
       {/* Header Fijo */}
@@ -80,7 +83,11 @@ const Layout: React.FC<LayoutProps> = ({ children, activeView, onViewChange, car
           onClick={() => onViewChange('list')}
         />
         <NavItem
-          icon={<User size={22} />}
+          icon={avatarUrl ? (
+            <img src={avatarUrl} alt="Perfil" className="w-[22px] h-[22px] rounded-full object-cover ring-2 ring-transparent transition-all" />
+          ) : (
+            <User size={22} />
+          )}
           label="Perfil"
           isActive={activeView === 'profile'}
           onClick={() => onViewChange('profile')}

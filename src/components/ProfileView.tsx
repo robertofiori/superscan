@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { User, LogOut, MapPin, CreditCard, ChevronRight, Bell, Camera, Check } from 'lucide-react';
+import { LogOut, MapPin, CreditCard, ChevronRight, Bell, Check } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-
+import LocationModal from './LocationModal';
+import AvatarUpload from './AvatarUpload';
 const PAYMENT_METHODS = [
   { 
     id: 'cuentadni', 
@@ -145,6 +146,7 @@ interface ProfileViewProps {
 const ProfileView: React.FC<ProfileViewProps> = ({ initialTab = 'settings', onTabChange }) => {
   const { user, userData, logout, updateUserData } = useAuth();
   const [activeTab, setActiveTab] = useState<'settings' | 'payments'>(initialTab);
+  const [showLocationModal, setShowLocationModal] = useState(false);
 
   // Sync internal state with prop
   React.useEffect(() => {
@@ -176,19 +178,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({ initialTab = 'settings', onTa
       {/* Header / Avatar Section */}
       <div className="relative bg-white p-8 rounded-[40px] shadow-xl border border-slate-100 flex flex-col items-center text-center overflow-hidden">
         <div className="absolute top-0 left-0 w-full h-24 bg-gradient-to-br from-primary-green/20 to-primary-orange/20 -z-10"></div>
-        
-        <div className="relative group">
-          <div className="w-28 h-28 bg-slate-100 rounded-[36px] flex items-center justify-center text-slate-400 overflow-hidden ring-8 ring-white shadow-2xl transition-transform group-hover:scale-105">
-            {userData?.avatarUrl || user.photoURL ? (
-              <img src={userData?.avatarUrl || user.photoURL!} alt="Avatar" className="w-full h-full object-cover" />
-            ) : (
-              <User size={48} />
-            )}
-          </div>
-          <button className="absolute bottom-1 -right-1 bg-primary-green text-white p-2.5 rounded-2xl shadow-lg border-4 border-white active:scale-90 transition-all">
-            <Camera size={18} />
-          </button>
-        </div>
+        <AvatarUpload />
 
         <div className="mt-6">
           <h2 className="text-2xl font-black text-slate-800 tracking-tight leading-none">
@@ -226,7 +216,8 @@ const ProfileView: React.FC<ProfileViewProps> = ({ initialTab = 'settings', onTa
             <ProfileItem 
               icon={<MapPin size={20} />} 
               label="Localización Actual" 
-              detail="Bahía Blanca, CP 8000" 
+              detail={userData?.location ? `${userData.location.city}, CP ${userData.location.zipCode}` : "Seleccionar ubicación"}
+              onClick={() => setShowLocationModal(true)}
             />
             
             <div className="px-6 py-4 flex items-center gap-4 border-t border-slate-50">
@@ -320,12 +311,14 @@ const ProfileView: React.FC<ProfileViewProps> = ({ initialTab = 'settings', onTa
           Compartir App
         </button>
       </div>
+
+      {showLocationModal && <LocationModal onClose={() => setShowLocationModal(false)} />}
     </div>
   );
 };
 
-const ProfileItem = ({ icon, label, detail }: any) => (
-  <button className="w-full px-6 py-5 flex items-center gap-4 hover:bg-slate-50 transition-colors group">
+const ProfileItem = ({ icon, label, detail, onClick }: any) => (
+  <button onClick={onClick} className="w-full px-6 py-5 flex items-center gap-4 hover:bg-slate-50 transition-colors group">
     <div className="w-10 h-10 bg-slate-50 text-slate-400 group-hover:text-primary-green group-hover:bg-green-50 rounded-2xl flex items-center justify-center transition-all">
       {icon}
     </div>

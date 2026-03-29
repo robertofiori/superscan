@@ -5,6 +5,7 @@ import ResultsView from './components/ResultsView';
 import ListView from './components/ListView';
 import ProfileView from './components/ProfileView';
 import Scanner from './components/Scanner';
+import OffersView from './components/OffersView';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { fetchProductInfo, getSupermarketPrices, type ProductData, type SupermarketPrice, type ShoppingListItem } from './api';
 import { AlertCircle, RefreshCw } from 'lucide-react';
@@ -217,12 +218,7 @@ const AppContent = () => {
       case 'profile':
         return <ProfileView initialTab={profileInitialTab} onTabChange={setProfileInitialTab} />;
       case 'offers':
-        return (
-          <div className="flex flex-col items-center justify-center min-h-[50vh] text-center">
-            <h2 className="text-2xl font-black text-slate-800 mb-2">Ofertas Exclusivas</h2>
-            <p className="text-slate-500 max-w-xs">Estamos recopilando las mejores ofertas del día para vos. ¡Volvé pronto!</p>
-          </div>
-        );
+        return <OffersView onAddToList={handleAddToList} />;
       default:
         return <HomeView onSearch={handleSearch} onScan={() => setScanning(true)} onViewChange={handleViewChange} />;
     }
