@@ -68,26 +68,51 @@ async function fetchVtex(storeName, domain, query) {
 async function fetchCoope(query) {
     var _a, _b;
     try {
-        const url = "https://us-central1-elchango-81e77.cloudfunctions.net/scrapeCoope";
-        const { data } = await axios_1.default.post(url, { data: { query: query } }, { timeout: 45000 });
-        if (((_a = data === null || data === void 0 ? void 0 : data.result) === null || _a === void 0 ? void 0 : _a.success) && ((_b = data.result.products) === null || _b === void 0 ? void 0 : _b.length) > 0) {
-            const topProducts = data.result.products.slice(0, 3);
-            return topProducts.map((p) => ({
-                id: "lacoope",
-                name: "Cooperativa Obrera",
-                price: p.price,
-                inStock: p.stock,
-                url: p.url || `https://www.lacoopeencasa.coop/sucursales/bahia-blanca/buscar?b=${encodeURIComponent(query)}`,
-                originalPrice: p.originalPrice || 0,
-                isOffer: !!p.isOffer,
-                imageUrl: p.imageUrl || '',
-                productName: p.name || 'Producto en La Coope',
-                brand: p.brand || ''
-            }));
+        const url = "https://api.lacoopeencasa.coop/api/articulos/pagina_busqueda";
+        // Configuración para Bahía Blanca (id_local: 840)
+        const payload = {
+            pagina: 1,
+            filtros: {
+                termino: query,
+                tipo_seleccion: "busqueda",
+                tipo_relacion: "busqueda",
+                modificado: false
+            }
+        };
+        const { data } = await axios_1.default.post(url, payload, {
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json, text/plain, */*',
+                'Origin': 'https://www.lacoopeencasa.coop',
+                'Referer': 'https://www.lacoopeencasa.coop/',
+                'is-mobile': 'true',
+                'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
+                'Cookie': `_lcec_linf={"id_local":"840"};`
+            },
+            timeout: 15000
+        });
+        if (((_b = (_a = data === null || data === void 0 ? void 0 : data.datos) === null || _a === void 0 ? void 0 : _a.articulos) === null || _b === void 0 ? void 0 : _b.length) > 0) {
+            const topProducts = data.datos.articulos.slice(0, 3);
+            return topProducts.map((p) => {
+                const price = parseFloat(p.precio) || 0;
+                const originalPrice = parseFloat(p.precio_lista) || price;
+                return {
+                    id: "lacoope",
+                    name: "Cooperativa Obrera",
+                    price: price,
+                    inStock: p.stock > 0,
+                    url: `https://www.lacoopeencasa.coop/articulo/${p.id_articulo}`,
+                    originalPrice: originalPrice,
+                    isOffer: originalPrice > price,
+                    imageUrl: p.imagen || '',
+                    productName: p.descripcion || 'Producto en La Coope',
+                    brand: p.marca || ''
+                };
+            });
         }
     }
     catch (error) {
-        logger.error("[Cooperativa Obrera] Error calling external Cloud Function:", error.message);
+        logger.error("[Cooperativa Obrera] Error calling Direct API:", error.message);
     }
     return [{ id: "lacoope", name: "Cooperativa Obrera", price: 0, inStock: false, url: '', originalPrice: 0, isOffer: false, imageUrl: '', productName: 'Producto no disponible', brand: '' }];
 }

@@ -1,6 +1,7 @@
-import React from 'react';
-import { ShoppingBasket, Trash2, Plus, Minus, Share2, Calculator, ExternalLink } from 'lucide-react';
-import { type ShoppingListItem } from './ShoppingList';
+import { ShoppingBasket, Trash2, Plus, Minus, Share2, Calculator, ExternalLink, Download } from 'lucide-react';
+import { type ShoppingListItem } from '../App';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 interface ListViewProps {
   items: ShoppingListItem[];
@@ -23,22 +24,63 @@ const ListView: React.FC<ListViewProps> = ({ items, onUpdateQuantity, onClear })
   const estimatedSavings = total * 0.15; // 15% de ahorro mock por ahora
 
   const handleWhatsAppExport = () => {
-    let message = "*Mi Lista de Compras (Optimizado por SuperScan)*\n\n";
+    let message = "*Mi Lista de Compras en ElMango 🥭*\n\n";
     Object.entries(grouped).forEach(([store, storeItems]) => {
-      message += `--- *${store.toUpperCase()}* ---\n`;
+      message += `🛒 *${store.toUpperCase()}*\n`;
       let storeTotal = 0;
       storeItems.forEach(it => {
         const itemTotal = it.price.price * it.quantity;
         storeTotal += itemTotal;
         message += `• ${it.quantity}x ${it.price.productName || it.product.product_name} - $${itemTotal.toLocaleString('es-AR')}\n`;
-        if (it.price.url) message += `  Ver: ${it.price.url}\n`;
       });
       message += `Subtotal: *$${storeTotal.toLocaleString('es-AR')}*\n\n`;
     });
-    message += `*Total General: $${total.toLocaleString('es-AR')}*\n`;
-    message += `*Ahorro Total Estimado: $${estimatedSavings.toLocaleString('es-AR')}* ✨`;
+    message += `💰 *Total General: $${total.toLocaleString('es-AR')}*\n`;
+    message += `✨ *Ahorro Estimado: $${estimatedSavings.toLocaleString('es-AR')}*`;
+    message += `\n\nOptimizado con ElMango 🥭 - Bahía Blanca`;
 
     window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, '_blank');
+  };
+
+  const handlePDFExport = () => {
+    const doc = new jsPDF();
+    
+    // Header
+    doc.setFontSize(22);
+    doc.setTextColor(34, 197, 94); // primary-green
+    doc.text('ElMango', 14, 20);
+    doc.setFontSize(10);
+    doc.setTextColor(100);
+    doc.text('Tu lista de compras optimizada - Bahía Blanca', 14, 26);
+    doc.text(`Fecha: ${new Date().toLocaleDateString()}`, 150, 20);
+
+    const tableData = items.map(item => [
+      String(item.price.productName || item.product.product_name || 'Producto'),
+      String(item.quantity || 1),
+      `$${(item.price.price || 0).toLocaleString('es-AR')}`,
+      String(item.price.supermarket || 'Distribuidora'),
+      `$${((item.price.price || 0) * (item.quantity || 1)).toLocaleString('es-AR')}`
+    ]);
+
+    autoTable(doc, {
+      startY: 35,
+      head: [['Producto', 'Cant.', 'P. Unit', 'Supermercado', 'Subtotal']],
+      body: tableData,
+      theme: 'grid',
+      headStyles: { fillColor: [34, 197, 94], textColor: [255, 255, 255], fontStyle: 'bold' },
+      foot: [[
+        { content: 'TOTAL GENERAL', colSpan: 4, styles: { halign: 'right', fontStyle: 'bold' } },
+        { content: `$${total.toLocaleString('es-AR')}`, styles: { fontStyle: 'bold' } }
+      ]],
+      footStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42] }
+    });
+
+    const finalY = (doc as any).lastAutoTable.finalY + 10;
+    doc.setFontSize(12);
+    doc.setTextColor(34, 197, 94);
+    doc.text(`Ahorro Estimado: $${estimatedSavings.toLocaleString('es-AR')}`, 14, finalY);
+    
+    doc.save('Mi-Lista-ElMango.pdf');
   };
 
   return (
@@ -140,13 +182,22 @@ const ListView: React.FC<ListViewProps> = ({ items, onUpdateQuantity, onClear })
             ))}
           </div>
 
-          <button 
-            onClick={handleWhatsAppExport}
-            className="w-full bg-primary-orange hover:bg-orange-600 text-white font-bold flex items-center justify-center gap-3 py-4 rounded-2xl shadow-lg transition-all active:scale-95"
-          >
-            <Share2 size={24} />
-            <span>Enviar Lista a WhatsApp</span>
-          </button>
+          <div className="flex flex-col gap-3">
+            <button 
+              onClick={handlePDFExport}
+              className="w-full bg-slate-900 hover:bg-black text-white font-black flex items-center justify-center gap-3 py-4 rounded-2xl shadow-xl transition-all active:scale-95 border-b-4 border-black"
+            >
+              <Download size={20} />
+              <span>Descargar Lista PDF</span>
+            </button>
+            <button 
+              onClick={handleWhatsAppExport}
+              className="w-full bg-[#25D366] hover:bg-[#128C7E] text-white font-black flex items-center justify-center gap-3 py-4 rounded-2xl shadow-xl transition-all active:scale-95 border-b-4 border-[#128C7E]"
+            >
+              <Share2 size={20} />
+              <span>Compartir por WhatsApp</span>
+            </button>
+          </div>
         </>
       )}
     </div>
