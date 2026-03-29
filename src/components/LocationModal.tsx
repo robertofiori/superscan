@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { X, MapPin, Search, Navigation, ExternalLink, Loader2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { X, MapPin, Search, Navigation, Loader2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { MapContainer, TileLayer, Marker, Popup, useMap, Circle } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';

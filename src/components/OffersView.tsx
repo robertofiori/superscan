@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Tag, AlertCircle, ShoppingBag, Plus, Sparkles } from 'lucide-react';
 import { fetchDailyOffers, type SupermarketPrice, type ProductData } from '../api';
 
