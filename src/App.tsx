@@ -60,7 +60,7 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
 
 
 const AppContent = () => {
-  const { user, loading: authLoading } = useAuth();
+  const { user, userData, loading: authLoading } = useAuth();
   const [showAuthScreen, setShowAuthScreen] = useState<'landing' | 'login'>('landing');
   const [activeView, setActiveView] = useState('home');
   const [scanning, setScanning] = useState(false);
@@ -123,7 +123,7 @@ const AppContent = () => {
 
       const [prodInfo, pricesData] = await Promise.all([
         isBarcode ? fetchProductInfo(lastScannedCode!) : Promise.resolve(null),
-        getSupermarketPrices(lastScannedCode!)
+        getSupermarketPrices(lastScannedCode!, userData?.location)
       ]);
 
       if (!active) return;
@@ -152,13 +152,30 @@ const AppContent = () => {
     setLastScannedCode(code);
   };
   
-  const handleAddToList = (prod: ProductData, best: SupermarketPrice) => {
+  const handleAddToList = (prod: ProductData, best: SupermarketPrice, allPrices: SupermarketPrice[]) => {
     setListItems(prev => {
-      const existing = prev.find(item => item.product.code === prod.code && item.price.id === best.id);
-      if (existing) {
-        return prev.map(item => item === existing ? { ...item, quantity: item.quantity + 1 } : item);
+      // Usar EAN o ID del producto para unicidad, ya que 'prod.code' puede ser la query de búsqueda
+      const productUniqueId = best.ean || best.id;
+      const existingIdx = prev.findIndex(item => (item.price.ean || item.price.id) === productUniqueId);
+      
+      if (existingIdx >= 0) {
+        const neue = [...prev];
+        neue[existingIdx] = { 
+          ...neue[existingIdx], 
+          quantity: neue[existingIdx].quantity + 1,
+          price: best, // Update to the "last added" price selection
+          allPrices: allPrices // Update with latest comparison data
+        };
+        return neue;
       }
-      return [...prev, { product: prod, price: best, quantity: 1 }];
+      return [...prev, { 
+        id: crypto.randomUUID(),
+        product: prod, 
+        price: best, 
+        allPrices: allPrices, 
+        quantity: 1,
+        checked: false
+      }];
     });
   };
 
@@ -181,9 +198,26 @@ const AppContent = () => {
   const renderView = () => {
     if (loading) {
       return (
-        <div className="flex flex-col items-center justify-center min-h-[50vh] animate-in fade-in">
-          <div className="w-16 h-16 border-4 border-primary-green border-t-transparent rounded-full animate-spin mb-4"></div>
-          <p className="font-bold text-slate-500">Buscando las mejores ofertas...</p>
+        <div className="flex flex-col gap-4 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-24 px-4 mt-6">
+          <div className="h-8 w-3/4 bg-slate-100 rounded-lg animate-pulse mb-4"></div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {[1, 2, 3, 4].map(i => (
+              <div key={i} className="bg-white rounded-[32px] p-5 shadow-sm border border-slate-100 flex flex-col gap-4">
+                <div className="w-full h-48 bg-slate-50 flex items-center justify-center rounded-2xl animate-pulse">
+                  <div className="w-16 h-16 bg-slate-100 rounded-full"></div>
+                </div>
+                <div className="h-5 w-full bg-slate-100 rounded-md animate-pulse mt-2"></div>
+                <div className="h-4 w-1/2 bg-slate-100 rounded-md animate-pulse"></div>
+                <div className="flex items-end justify-between mt-2 pt-4 border-t border-slate-50">
+                   <div className="flex flex-col gap-2">
+                     <div className="h-8 w-24 bg-slate-100 rounded-lg animate-pulse"></div>
+                     <div className="h-3 w-16 bg-slate-100 rounded-md animate-pulse"></div>
+                   </div>
+                   <div className="h-14 w-14 bg-slate-50 rounded-2xl animate-pulse"></div>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       );
     }
@@ -210,6 +244,13 @@ const AppContent = () => {
                 nueva[idx].quantity += delta;
                 if (nueva[idx].quantity <= 0) nueva.splice(idx, 1);
                 return nueva;
+              });
+            }}
+            onUpdatePrice={(idx, newPrice) => {
+              setListItems(prev => {
+                const neue = [...prev];
+                neue[idx] = { ...neue[idx], price: newPrice };
+                return neue;
               });
             }}
             onClear={() => setListItems([])}

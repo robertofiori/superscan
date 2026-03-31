@@ -131,6 +131,42 @@ export default function LocationModal({ onClose }: LocationModalProps) {
     }
   };
 
+  const handleCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      alert("Tu navegador no soporta geolocalización.");
+      return;
+    }
+    setLoading(true);
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords;
+        setCenter([latitude, longitude]);
+        generateMarkers(latitude, longitude);
+
+        try {
+          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=10`);
+          const data = await res.json();
+          if (data && data.address) {
+            const city = data.address.city || data.address.town || data.address.village || data.address.county || 'Tu Ubicación';
+            const province = data.address.state || 'Desconocida';
+            setCityData({ city, province, zipCode: data.address.postcode || '0000' });
+            setSearchQuery(city);
+          }
+        } catch (e) {
+          console.error("Error en reverse geocoding:", e);
+        } finally {
+          setLoading(false);
+        }
+      },
+      (error) => {
+        console.error("Error obteniendo ubicación:", error);
+        alert("No se pudo obtener tu ubicación actual. Verifica los permisos de tu navegador.");
+        setLoading(false);
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  };
+
   const handleSaveLocation = async () => {
       await updateUserData({
           location: {
@@ -154,14 +190,14 @@ export default function LocationModal({ onClose }: LocationModalProps) {
           </div>
           <button 
             onClick={onClose}
-            className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-slate-500 hover:bg-slate-200 transition-colors shrink-0"
+            className="min-w-[44px] min-h-[44px] bg-slate-100 rounded-full flex items-center justify-center text-slate-500 hover:bg-slate-200 transition-colors shrink-0"
           >
             <X size={20} />
           </button>
         </div>
 
         {/* Buscador */}
-        <div className="px-6 pb-4 bg-white z-10">
+        <div className="px-6 pb-4 bg-white z-10 flex flex-col gap-3">
           <div className="flex gap-2 relative">
             <input 
               type="text" 
@@ -174,11 +210,19 @@ export default function LocationModal({ onClose }: LocationModalProps) {
             <button 
                 onClick={() => handleSearch()}
                 disabled={loading}
-                className="bg-primary-green text-white w-12 rounded-2xl flex items-center justify-center shadow-md active:scale-95 transition-all overflow-hidden"
+                className="bg-primary-green text-white min-w-[44px] min-h-[44px] rounded-2xl flex items-center justify-center shadow-md active:scale-95 transition-all overflow-hidden"
             >
                 {loading ? <Loader2 size={20} className="animate-spin" /> : <Search size={20} />}
             </button>
           </div>
+          <button 
+             onClick={handleCurrentLocation} 
+             disabled={loading}
+             className="flex items-center gap-2 text-primary-green text-sm font-bold w-fit hover:text-green-700 transition-colors disabled:opacity-50 min-h-[44px]"
+          >
+            {loading ? <Loader2 size={16} className="animate-spin" /> : <MapPin size={16} />} 
+            Usar mi ubicación actual
+          </button>
         </div>
 
         {/* Mapa Leaflet */}

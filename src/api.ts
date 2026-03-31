@@ -1,3 +1,5 @@
+import { calculatePricePerUnit } from './utils/unitParser';
+
 export interface ProductData {
   code: string;
   product_name?: string;
@@ -37,11 +39,25 @@ export interface SupermarketPrice {
   imageUrl?: string;
   productName?: string;
   brand?: string;
+  pricePerUnit?: number;
+  unitType?: string;
+  ean?: string;
 }
 
-export async function getSupermarketPrices(query: string): Promise<SupermarketPrice[]> {
+export interface LocationData {
+  id: string;
+  city: string;
+  province: string;
+  zipCode: string;
+}
+
+export async function getSupermarketPrices(query: string, location?: LocationData): Promise<SupermarketPrice[]> {
   try {
-    const res = await fetch(`https://us-central1-auraverde-db.cloudfunctions.net/getSupermarketPrices?query=${encodeURIComponent(query)}`);
+    let url = `https://us-central1-auraverde-db.cloudfunctions.net/getSupermarketPrices?query=${encodeURIComponent(query)}`;
+    if (location) {
+      url += `&zipCode=${location.zipCode}&city=${encodeURIComponent(location.city)}`;
+    }
+    const res = await fetch(url);
     if (!res.ok) throw new Error("Network response was not ok");
     
     const data = await res.json();
@@ -49,18 +65,24 @@ export async function getSupermarketPrices(query: string): Promise<SupermarketPr
     // Filtramos y adaptamos el campo name -> supermarket
     const validPrices: SupermarketPrice[] = data
       .filter((item: any) => item != null)
-      .map((item: any) => ({
-        id: item.id,
-        supermarket: item.name,
-        price: item.price,
-        inStock: item.inStock,
-        url: item.url,
-        originalPrice: item.originalPrice,
-        isOffer: item.isOffer,
-        imageUrl: item.imageUrl,
-        productName: item.productName,
-        brand: item.brand
-      }));
+      .map((item: any) => {
+        const unitCalc = calculatePricePerUnit(item.price, item.productName || '');
+        return {
+          id: item.id,
+          supermarket: item.name,
+          price: item.price,
+          inStock: item.inStock,
+          url: item.url,
+          originalPrice: item.originalPrice,
+          isOffer: item.isOffer,
+          imageUrl: item.imageUrl,
+          productName: item.productName,
+          brand: item.brand,
+          pricePerUnit: unitCalc?.pricePerUnit,
+          unitType: unitCalc?.unitLabel,
+          ean: item.ean
+        };
+      });
 
 
     // Ordenar: primero los que tienen stock y precio > 0, de más barato a más caro.
@@ -106,13 +128,13 @@ export async function fetchSearchSuggestions(query: string, type?: string, size?
   }
 }
 
-export async function fetchDailyOffers(): Promise<SupermarketPrice[]> {
+export async function fetchDailyOffers(location?: LocationData): Promise<SupermarketPrice[]> {
   const categories = ['aceite', 'leche', 'arroz', 'fideos', 'limpieza'];
   
   try {
     // Fetch prices for a set of common categories concurrently
     const searchResults = await Promise.all(
-      categories.map(cat => getSupermarketPrices(cat))
+      categories.map(cat => getSupermarketPrices(cat, location))
     );
 
     // Flatten results and filter only items with offers and stock
@@ -141,7 +163,10 @@ export async function fetchDailyOffers(): Promise<SupermarketPrice[]> {
 }
 
 export interface ShoppingListItem {
+  id: string;
   product: ProductData;
   price: SupermarketPrice;
+  allPrices: SupermarketPrice[];
   quantity: number;
+  checked: boolean;
 }

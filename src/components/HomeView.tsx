@@ -73,14 +73,18 @@ const HomeView: React.FC<HomeViewProps> = ({ onSearch, onScan, onViewChange }) =
   const otherPromos = BANK_PROMOS.filter(p => !paymentMethods.includes(p.methodId));
 
   useEffect(() => {
+    let active = true;
     async function loadOffers() {
       setLoading(true);
-      const data = await fetchDailyOffers();
-      setOffers(data);
-      setLoading(false);
+      const data = await fetchDailyOffers(userData?.location);
+      if (active) {
+        setOffers(data);
+        setLoading(false);
+      }
     }
     loadOffers();
-  }, []);
+    return () => { active = false; };
+  }, [userData?.location]);
 
   return (
     <div className="flex flex-col gap-8 animate-in fade-in slide-in-from-bottom-4 duration-500">

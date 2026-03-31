@@ -1,16 +1,25 @@
-import { ShoppingBasket, Trash2, Plus, Minus, Share2, Calculator, ExternalLink, Download } from 'lucide-react';
-import { type ShoppingListItem } from '../api';
+import React from 'react';
+import { 
+  ShoppingBasket, Trash2, Plus, Minus, Share2, 
+  ExternalLink, Download, Sparkles, 
+  TrendingDown, Store
+} from 'lucide-react';
+import { type ShoppingListItem, type SupermarketPrice } from '../api';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { calculateOptimization } from '../utils/basketOptimizer';
 
 interface ListViewProps {
   items: ShoppingListItem[];
   onUpdateQuantity: (index: number, delta: number) => void;
+  onUpdatePrice: (index: number, newPrice: SupermarketPrice) => void;
   onClear: () => void;
 }
 
-const ListView: React.FC<ListViewProps> = ({ items, onUpdateQuantity, onClear }) => {
-  // Agrupar por supermercado
+const ListView: React.FC<ListViewProps> = ({ items, onUpdateQuantity, onUpdatePrice, onClear }) => {
+  const optimization = calculateOptimization(items);
+  
+  // Group by supermarket
   const grouped = items.reduce((acc, item) => {
     const store = item.price.supermarket;
     if (!acc[store]) acc[store] = [];
@@ -19,9 +28,7 @@ const ListView: React.FC<ListViewProps> = ({ items, onUpdateQuantity, onClear })
   }, {} as Record<string, ShoppingListItem[]>);
 
   const total = items.reduce((sum, item) => sum + item.price.price * item.quantity, 0);
-  
-  // Calcular ahorro (comparar con el siguiente precio más caro de la misma tienda si existiera, o simplemente un mock de ahorro)
-  const estimatedSavings = total * 0.15; // 15% de ahorro mock por ahora
+  const potentialSavings = total - optimization.theoreticalMin;
 
   const handleWhatsAppExport = () => {
     let message = "*Mi Lista de Compras en ElMango 🥭*\n\n";
@@ -36,7 +43,7 @@ const ListView: React.FC<ListViewProps> = ({ items, onUpdateQuantity, onClear })
       message += `Subtotal: *$${storeTotal.toLocaleString('es-AR')}*\n\n`;
     });
     message += `💰 *Total General: $${total.toLocaleString('es-AR')}*\n`;
-    message += `✨ *Ahorro Estimado: $${estimatedSavings.toLocaleString('es-AR')}*`;
+    message += `✨ *Ahorro Total Posible: $${potentialSavings.toLocaleString('es-AR')}*`;
     message += `\n\nOptimizado con ElMango 🥭 - Bahía Blanca`;
 
     window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, '_blank');
@@ -111,7 +118,7 @@ const ListView: React.FC<ListViewProps> = ({ items, onUpdateQuantity, onClear })
     doc.text(`TOTAL GENERAL: $${total.toLocaleString('es-AR')}`, 14, currentY);
     currentY += 7;
     doc.setTextColor(34, 197, 94);
-    doc.text(`Ahorro Estimado: $${estimatedSavings.toLocaleString('es-AR')}`, 14, currentY);
+    doc.text(`Ahorro Extra Posible (si dividís la compra): $${potentialSavings.toLocaleString('es-AR')}`, 14, currentY);
     
     doc.save('Mi-Lista-ElMango.pdf');
   };
@@ -137,19 +144,76 @@ const ListView: React.FC<ListViewProps> = ({ items, onUpdateQuantity, onClear })
         </div>
       ) : (
         <>
-          {/* Tarjeta de Resumen */}
-          <div className="bg-primary-green text-white rounded-[32px] p-6 shadow-xl shadow-green-200/50 flex flex-col gap-4">
-            <div className="flex justify-between items-center opacity-90">
-              <span className="font-bold uppercase tracking-widest text-xs">Ahorro Estimado</span>
-              <Calculator size={20} />
+          {/* Optimization Strategy Switcher */}
+          <div className="flex flex-col gap-4">
+            <div className="bg-slate-900 text-white rounded-[32px] p-6 shadow-xl relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-primary-green opacity-20 blur-3xl -mr-16 -mt-16"></div>
+                <div className="relative z-10 flex flex-col gap-4">
+                    <div className="flex justify-between items-center">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-primary-green">Estrategia de Ahorro</span>
+                        <Sparkles size={18} className="text-primary-green" />
+                    </div>
+                    <div>
+                        <span className="text-3xl font-black">${total.toLocaleString('es-AR')}</span>
+                        <p className="text-xs font-bold text-slate-400 mt-1">Total actual de tu canasta</p>
+                    </div>
+                    
+                    {potentialSavings > 0 && (
+                        <div className="bg-white/10 rounded-2xl p-4 flex items-center justify-between border border-white/10">
+                            <div className="flex flex-col">
+                                <span className="text-xs font-bold text-primary-green flex items-center gap-1 uppercase tracking-tighter">
+                                    <TrendingDown size={14} /> Máximo Ahorro Posible
+                                </span>
+                                <span className="text-lg font-black text-white">
+                                    ¡Ganás ${potentialSavings.toLocaleString('es-AR')}!
+                                </span>
+                            </div>
+                            <div className="text-right">
+                                <span className="text-xs font-bold text-slate-400 block">Total Optimizado</span>
+                                <span className="text-sm font-black text-primary-green">${optimization.theoreticalMin.toLocaleString('es-AR')}</span>
+                            </div>
+                        </div>
+                    )}
+                </div>
             </div>
-            <div className="flex items-baseline gap-2">
-              <span className="text-4xl font-black">${total.toLocaleString('es-AR')}</span>
-              <span className="text-sm font-bold opacity-80">Total</span>
+
+            {/* Comparison by Supermarket Carousel */}
+            <div className="flex gap-4 overflow-x-auto pb-4 no-scrollbar -mx-4 px-4">
+                {optimization.totalsPerSupermarket.map((sm, idx) => (
+                    <div 
+                        key={idx}
+                        className={`min-w-[240px] bg-white rounded-3xl p-5 border-2 shadow-sm transition-all shrink-0 ${
+                            sm.supermarket === optimization.bestSupermarket?.supermarket ? 'border-primary-green/30 bg-green-50/5' : 'border-slate-100 opacity-80'
+                        }`}
+                    >
+                        <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-2">
+                                <div className={`p-2 rounded-xl ${sm.supermarket === optimization.bestSupermarket?.supermarket ? 'bg-primary-green/10 text-primary-green' : 'bg-slate-100 text-slate-500'}`}>
+                                    <Store size={16} />
+                                </div>
+                                <span className="font-black text-sm uppercase tracking-tight truncate max-w-[120px]">{sm.supermarket}</span>
+                            </div>
+                            {sm.supermarket === optimization.bestSupermarket?.supermarket && (
+                                <span className="bg-primary-green text-white text-[8px] font-black px-2 py-1 rounded-full">RECOMENDADO</span>
+                            )}
+                        </div>
+                        <div className="flex flex-col gap-1">
+                            <span className="text-sm text-slate-400 font-bold italic truncate">Todo en este lugar:</span>
+                            <span className="text-xl font-black text-slate-800">${sm.total.toLocaleString('es-AR')}</span>
+                            <div className="flex items-center justify-between mt-2">
+                                <span className="text-[10px] font-bold text-slate-500 italic">
+                                    {sm.itemCount} de {items.length} productos
+                                </span>
+                                {sm.savingsVsCurrent > 0 && (
+                                    <span className="text-[10px] font-black text-primary-green italic">
+                                        -{((sm.savingsVsCurrent / total) * 100).toFixed(0)}% OFF
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                ))}
             </div>
-            <p className="bg-white/20 px-3 py-1 rounded-full text-xs font-bold self-start border border-white/30">
-              Estás ahorrando aprox. ${estimatedSavings.toLocaleString('es-AR')}
-            </p>
           </div>
 
           {/* Listado agrupado */}
@@ -159,58 +223,82 @@ const ListView: React.FC<ListViewProps> = ({ items, onUpdateQuantity, onClear })
                 <h3 className="text-xs font-black uppercase tracking-widest text-slate-400 border-b border-slate-200 pb-2">
                   {store}
                 </h3>
-                {storeItems.map((item, idx) => (
-                  <div key={idx} className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 flex gap-4 items-center">
-                    <div className="w-12 h-12 shrink-0 bg-white rounded-xl overflow-hidden p-2 flex items-center justify-center relative group">
-                        <img src={item.price.imageUrl} alt={item.price.productName} className="w-full h-full object-contain" />
-                        {item.price.url && (
-                          <a 
-                            href={item.price.url} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="absolute inset-0 bg-black/5 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity"
-                          >
-                            <ExternalLink size={14} className="text-white drop-shadow-md" />
-                          </a>
-                        )}
-                    </div>
-                    <div className="flex flex-col flex-1 min-w-0">
-                      <h4 className="font-bold text-slate-800 text-sm line-clamp-1 leading-tight flex items-center gap-1">
-                        {item.price.productName || item.product.product_name}
-                      </h4>
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-primary-green font-black mt-0.5">
-                          ${(item.price.price * item.quantity).toLocaleString('es-AR')}
-                        </span>
-                        {item.price.url && (
+                {storeItems.map((item, idx) => {
+                  const itemIndex = items.indexOf(item);
+                  const betterPrice = (item.allPrices || [])
+                    .filter(p => p.inStock && p.price < item.price.price && p.price > 0)
+                    .sort((a, b) => a.price - b.price)[0];
+
+                  return (
+                    <div key={idx} className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 flex gap-4 items-center relative">
+                      <div className="w-12 h-12 shrink-0 bg-white rounded-xl overflow-hidden p-2 flex items-center justify-center relative group">
+                          <img src={item.price.imageUrl} alt={item.price.productName} className="w-full h-full object-contain" />
+                          {item.price.url && (
                             <a 
-                                href={item.price.url} 
-                                target="_blank" 
-                                rel="noopener noreferrer"
-                                className="text-[9px] font-bold text-slate-400 hover:text-primary-orange flex items-center gap-0.5"
+                              href={item.price.url} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="absolute inset-0 bg-black/5 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity"
                             >
-                                <ExternalLink size={8} /> Tienda
+                              <ExternalLink size={14} className="text-white drop-shadow-md" />
                             </a>
-                        )}
+                          )}
                       </div>
+                      <div className="flex flex-col flex-1 min-w-0">
+                        <h4 className="font-bold text-slate-800 text-sm line-clamp-1 leading-tight flex items-center gap-1">
+                          {item.price.productName || item.product.product_name}
+                        </h4>
+                        <div className="flex items-center justify-between">
+                          <div className="flex flex-col">
+                            <span className="text-xs text-primary-green font-black mt-0.5">
+                              ${(item.price.price * item.quantity).toLocaleString('es-AR')}
+                            </span>
+                            {item.price.pricePerUnit && item.price.unitType && (
+                              <span className="text-[10px] text-slate-400 font-bold">
+                                ${item.price.pricePerUnit.toLocaleString('es-AR', {maximumFractionDigits: 0})} / {item.price.unitType}
+                              </span>
+                            )}
+                          </div>
+                          {item.price.url && (
+                              <a 
+                                  href={item.price.url} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  className="text-[9px] font-bold text-slate-400 hover:text-primary-orange flex items-center gap-0.5"
+                              >
+                                  <ExternalLink size={8} /> Tienda
+                              </a>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center bg-slate-100 rounded-xl px-1 py-1">
+                        <button 
+                           onClick={() => onUpdateQuantity(itemIndex, -1)}
+                           className="w-11 h-11 flex items-center justify-center text-slate-500 active:bg-slate-200 rounded-lg transition-colors"
+                        >
+                          <Minus size={20} />
+                        </button>
+                        <span className="px-2 font-black text-sm w-8 text-center">{item.quantity}</span>
+                        <button 
+                           onClick={() => onUpdateQuantity(itemIndex, 1)}
+                           className="w-11 h-11 flex items-center justify-center text-primary-green active:bg-green-100 rounded-lg transition-colors"
+                        >
+                          <Plus size={20} />
+                        </button>
+                      </div>
+
+                      {/* Better Price Suggestions */}
+                      {betterPrice && (
+                        <button 
+                          onClick={() => onUpdatePrice(itemIndex, betterPrice)}
+                          className="absolute -top-2 right-4 bg-primary-orange text-white px-3 py-1 rounded-full text-[9px] font-black shadow-lg border-2 border-white flex items-center gap-1 active:scale-95 transition-transform"
+                        >
+                          <TrendingDown size={10} /> BUSCAR A ${betterPrice.price}
+                        </button>
+                      )}
                     </div>
-                    <div className="flex items-center bg-slate-100 rounded-xl px-1 py-1">
-                      <button 
-                         onClick={() => onUpdateQuantity(items.indexOf(item), -1)}
-                         className="w-8 h-8 flex items-center justify-center text-slate-500"
-                      >
-                        <Minus size={16} />
-                      </button>
-                      <span className="px-2 font-black text-sm w-6 text-center">{item.quantity}</span>
-                      <button 
-                         onClick={() => onUpdateQuantity(items.indexOf(item), 1)}
-                         className="w-8 h-8 flex items-center justify-center text-primary-green"
-                      >
-                        <Plus size={16} />
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ))}
           </div>

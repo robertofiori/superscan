@@ -5,7 +5,7 @@ import { type ProductData, type SupermarketPrice } from '../api';
 interface ResultsViewProps {
   product: ProductData;
   prices: SupermarketPrice[];
-  onAddToList: (product: ProductData, bestPrice: SupermarketPrice) => void;
+  onAddToList: (product: ProductData, bestPrice: SupermarketPrice, allPrices: SupermarketPrice[]) => void;
   onBack: () => void;
 }
 
@@ -185,7 +185,16 @@ const ResultsView: React.FC<ResultsViewProps> = ({ product, prices, onAddToList,
                         <button 
                             onClick={(e) => {
                                 e.stopPropagation();
-                                p.inStock && onAddToList(product, p);
+                                if (p.inStock) {
+                                  // Filtrar precios similares para este producto específico
+                                  // Queremos comparar LO MISMO en otros supers
+                                  const relevantPrices = prices.filter(other => {
+                                    const sameBrand = other.brand?.toLowerCase() === p.brand?.toLowerCase();
+                                    const similarName = other.productName?.toLowerCase().includes(p.productName?.split(' ')[0].toLowerCase() || '');
+                                    return sameBrand || similarName;
+                                  });
+                                  onAddToList(product, p, relevantPrices);
+                                }
                             }}
                             disabled={!p.inStock}
                             className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all shadow-lg shrink-0 ${

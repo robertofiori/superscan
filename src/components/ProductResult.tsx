@@ -9,28 +9,7 @@ interface ProductResultProps {
   onScanAnother: () => void;
 }
 
-function extractSize(name: string): number {
-  if (!name) return 0;
-  const normalizedName = name.toLowerCase();
-  
-  // Try to find L / Litros
-  const lMatch = normalizedName.match(/(\d+(?:[.,]\d+)?)\s*(?:l|lt|litro|litros)\b/);
-  if (lMatch) return parseFloat(lMatch[1].replace(',', '.')) * 1000;
-  
-  // Try to find ML / CC / CM3
-  const mlMatch = normalizedName.match(/(\d+(?:[.,]\d+)?)\s*(?:ml|militros|cc|cm3|cm³)\b/);
-  if (mlMatch) return parseFloat(mlMatch[1].replace(',', '.'));
-  
-  // Try to find KG / Kilos 
-  const kgMatch = normalizedName.match(/(\d+(?:[.,]\d+)?)\s*(?:kg|kilo|kilos)\b/);
-  if (kgMatch) return parseFloat(kgMatch[1].replace(',', '.')) * 1000;
-  
-  // Try to find G / GR / Gramos
-  const gMatch = normalizedName.match(/(\d+(?:[.,]\d+)?)\s*(?:g|gr|grs|gramo|gramos)\b/);
-  if (gMatch) return parseFloat(gMatch[1].replace(',', '.'));
-  
-  return 0; // Unknown size
-}
+import { parseUnitInfo } from '../utils/unitParser';
 
 export default function ProductResult({ product, prices, onAddToList, onScanAnother }: ProductResultProps) {
   const [sortBy, setSortBy] = useState<'price' | 'size'>('price');
@@ -47,8 +26,8 @@ export default function ProductResult({ product, prices, onAddToList, onScanAnot
     if (sortBy === 'price') {
       comparison = a.price - b.price;
     } else {
-      const sizeA = extractSize(a.productName || '');
-      const sizeB = extractSize(b.productName || '');
+      const sizeA = parseUnitInfo(a.productName || '')?.normalizedSize || 0;
+      const sizeB = parseUnitInfo(b.productName || '')?.normalizedSize || 0;
       // If sizes are identical, sort by price naturally ascending
       if (sizeA === sizeB) {
         return a.price - b.price;
@@ -185,6 +164,12 @@ export default function ProductResult({ product, prices, onAddToList, onScanAnot
                       ) : (
                         <span className={`text-xl font-black mt-1 ${isBest ? 'text-primary' : 'text-slate-800 dark:text-slate-100'}`}>
                           ${p.price.toLocaleString('es-AR')}
+                        </span>
+                      )}
+                      
+                      {p.pricePerUnit && p.unitType && (
+                        <span className="text-[10px] text-slate-500 font-bold mt-0.5">
+                          ${p.pricePerUnit.toLocaleString('es-AR', {maximumFractionDigits: 0})} / {p.unitType}
                         </span>
                       )}
                       

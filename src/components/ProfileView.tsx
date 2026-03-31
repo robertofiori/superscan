@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LogOut, MapPin, CreditCard, ChevronRight, Bell, Check } from 'lucide-react';
+import { LogOut, MapPin, CreditCard, ChevronRight, Bell, Check, AlertCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import LocationModal from './LocationModal';
 import AvatarUpload from './AvatarUpload';
@@ -310,6 +310,17 @@ const ProfileView: React.FC<ProfileViewProps> = ({ initialTab = 'settings', onTa
         >
           Compartir App
         </button>
+      </div>
+
+      {/* Disclaimer Legal */}
+      <div className="bg-slate-50 border border-slate-200 rounded-3xl p-6 text-center max-w-sm mx-auto w-full">
+        <h4 className="font-black text-slate-700 justify-center text-xs mb-2 flex items-center gap-1 uppercase tracking-widest">
+          <AlertCircle size={14} className="text-primary-orange" />
+          Aviso Legal
+        </h4>
+        <p className="text-[10px] text-slate-400 font-bold leading-relaxed uppercase tracking-wider">
+          Los precios indicados son referenciales y pueden variar en cada sucursal. Los nombres de las cadenas (EJ: Carrefour, ChangoMás) se utilizan únicamente con fines comparativos e informativos y son propiedad de sus respectivos dueños.
+        </p>
       </div>
 
       {showLocationModal && <LocationModal onClose={() => setShowLocationModal(false)} />}

@@ -68,6 +68,12 @@ async function fetchVtex(storeName: string, domain: string, query: string) {
   }];
 }
 
+async function fetchCoto(query: string) {
+  // Coto no es VTEX, requiere scraping o una API específica.
+  // Por ahora devolvemos un placeholder vacío para evitar errores.
+  return [];
+}
+
 async function getCoopeSession() {
   try {
     const response = await axios.get("https://www.lacoopeencasa.coop/", {
@@ -171,26 +177,53 @@ async function fetchCoope(query: string): Promise<any[]> {
   return [{ id: "lacoope", name: "Cooperativa Obrera", price: 0, inStock: false, url: '', originalPrice: 0, isOffer: false, imageUrl: '', productName: 'Producto no disponible', brand: '' }];
 }
 
+const CITY_CHAINS: Record<string, string[]> = {
+  "default": ["carrefour", "masonline", "vea", "lacoope", "dia", "coto"],
+  "bahia blanca": ["carrefour", "masonline", "vea", "lacoope", "dia", "coto"],
+  "mar del plata": ["carrefour", "masonline", "vea", "lacoope", "dia", "coto", "disco", "toledo"],
+  "caba": ["carrefour", "masonline", "vea", "lacoope", "dia", "coto", "disco"],
+  "neuquen": ["carrefour", "laanonima", "vea", "lacoope", "dia"],
+  "bariloche": ["carrefour", "laanonima", "todo", "vea"]
+};
+
 export const getSupermarketPrices = onRequest({ timeoutSeconds: 60, memory: "256MiB" }, (req, res) => {
   corsHandler(req, res, async () => {
     const q = (req.query.query || req.query.barcode) as string;
+    const city = (req.query.city as string || "").toLowerCase().trim();
     
     if (!q) {
       res.status(400).json({ error: "Query or Barcode is required" });
       return;
     }
 
-    logger.info("Buscando ofertas reales para:", q);
+    logger.info(`Buscando [${q}] en [${city || 'ubicación por defecto'}]`);
+
+    // Determinar qué cadenas buscar basándonos en la ciudad
+    let allowedChains = CITY_CHAINS[city] || CITY_CHAINS["default"];
+    
+    // Si la ciudad contiene "bahia blanca", forzamos el filtrado estricto
+    if (city.includes("bahia blanca")) {
+      allowedChains = CITY_CHAINS["bahia blanca"];
+    }
 
     try {
-      const results = await Promise.all([
-        fetchVtex("Carrefour", "www.carrefour.com.ar", q),
-        fetchVtex("Chango Más", "www.masonline.com.ar", q),
-        fetchVtex("VEA", "www.vea.com.ar", q),
-        fetchCoope(q)
-      ]);
+      const fetchers: Promise<any[]>[] = [];
       
-      const flatResults = results.flat();
+      if (allowedChains.includes("carrefour")) fetchers.push(fetchVtex("Carrefour", "www.carrefour.com.ar", q));
+      if (allowedChains.includes("masonline")) fetchers.push(fetchVtex("Chango Más", "www.masonline.com.ar", q));
+      if (allowedChains.includes("vea")) fetchers.push(fetchVtex("VEA", "www.vea.com.ar", q));
+      if (allowedChains.includes("lacoope")) fetchers.push(fetchCoope(q));
+      if (allowedChains.includes("dia")) fetchers.push(fetchVtex("Día", "diaonline.supermercadosdia.com.ar", q));
+      if (allowedChains.includes("disco")) fetchers.push(fetchVtex("Disco", "www.disco.com.ar", q));
+      if (allowedChains.includes("toledo")) fetchers.push(fetchVtex("Toledo", "www.toledodigital.com.ar", q));
+      if (allowedChains.includes("laanonima")) fetchers.push(fetchVtex("La Anónima", "www.laanonima.com.ar", q));
+      
+      // Coto es especial (pendiente implementación robusta, por ahora simulamos si está permitido)
+      if (allowedChains.includes("coto")) fetchers.push(fetchCoto(q));
+
+      const results = await Promise.all(fetchers);
+      const flatResults = results.flat().filter(r => r.price > 0);
+      
       res.json(flatResults);
     } catch (error: any) {
       logger.error("Error global en getSupermarketPrices:", error);
@@ -269,7 +302,7 @@ export const getSearchSuggestions = onRequest({ timeoutSeconds: 60, memory: "256
           products: suggestions.slice(0, 20)
         });
       } else {
-        res.json([]);
+        res.json({ types: [], sizes: [], products: [] });
       }
     } catch (error: any) {
       logger.error("Error en getSearchSuggestions:", error);

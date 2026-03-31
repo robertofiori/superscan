@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
-import { Tag, AlertCircle, ShoppingBag, Plus, Sparkles } from 'lucide-react';
+import { ShoppingBag, Sparkles, AlertCircle, Plus } from 'lucide-react';
 import { fetchDailyOffers, type SupermarketPrice, type ProductData } from '../api';
+import { useAuth } from '../contexts/AuthContext';
 
 interface OffersViewProps {
-  onAddToList: (product: ProductData, bestPrice: SupermarketPrice) => void;
+  onAddToList: (product: ProductData, bestPrice: SupermarketPrice, allPrices: SupermarketPrice[]) => void;
 }
 
 export default function OffersView({ onAddToList }: OffersViewProps) {
+  const { userData } = useAuth();
   const [offers, setOffers] = useState<SupermarketPrice[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -14,7 +16,7 @@ export default function OffersView({ onAddToList }: OffersViewProps) {
     let active = true;
     const loadOpts = async () => {
       setLoading(true);
-      const data = await fetchDailyOffers();
+      const data = await fetchDailyOffers(userData?.location);
       if (active) {
         setOffers(data);
         setLoading(false);
@@ -25,24 +27,51 @@ export default function OffersView({ onAddToList }: OffersViewProps) {
   }, []);
 
   const handleAdd = (priceItem: SupermarketPrice) => {
-    // Reconstruimos la ProductData mínima requerida por ListService basándonos en SupermarketPrice
+    // Buscar precios del mismo producto en otras tiendas dentro de las ofertas actuales
+    const relevantPrices = offers.filter(o => 
+      o.brand?.toLowerCase() === priceItem.brand?.toLowerCase() &&
+      o.productName?.toLowerCase().includes(priceItem.productName?.split(' ')[0].toLowerCase() || '')
+    );
+
     const prod: ProductData = {
-      code: `offer-${priceItem.id}`,
+      code: priceItem.ean || `offer-${priceItem.id}`,
       product_name: priceItem.productName,
       brands: priceItem.brand,
       image_url: priceItem.imageUrl,
     };
-    onAddToList(prod, priceItem);
+    
+    // Asegurarnos de que el precio actual esté incluido en relevantPrices
+    if (!relevantPrices.find(p => p.id === priceItem.id)) {
+      relevantPrices.push(priceItem);
+    }
+
+    onAddToList(prod, priceItem, relevantPrices);
   };
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[50vh] animate-in fade-in">
-        <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center animate-pulse mb-4">
-          <Tag className="text-yellow-500" size={32} />
+      <div className="flex flex-col gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-24 h-full">
+        <div className="relative bg-white p-6 rounded-[32px] shadow-sm border border-slate-100 flex flex-col items-center text-center overflow-hidden">
+             <div className="w-16 h-16 bg-slate-200 rounded-2xl animate-pulse mb-4"></div>
+             <div className="w-48 h-6 bg-slate-200 rounded-full animate-pulse mb-2"></div>
+             <div className="w-64 h-4 bg-slate-200 rounded-full animate-pulse"></div>
         </div>
-        <h2 className="text-xl font-black text-slate-800 mb-2">Buscando Ofertas...</h2>
-        <p className="font-medium text-slate-500 max-w-[250px] text-center text-sm">Escaneando todos los supermercados para traerte los mejores precios.</p>
+        <div className="grid grid-cols-2 gap-4">
+          {[1, 2, 3, 4].map((i) => (
+             <div key={i} className="bg-white rounded-[24px] p-4 flex flex-col shadow-sm border border-slate-100 h-[260px]">
+               <div className="w-12 h-4 bg-slate-200 rounded-full animate-pulse mb-4 self-end"></div>
+               <div className="h-28 w-full bg-slate-100 rounded-xl animate-pulse mb-3"></div>
+               <div className="w-1/2 h-3 bg-slate-200 rounded-full animate-pulse mb-2"></div>
+               <div className="w-full h-4 bg-slate-200 rounded-full animate-pulse mb-1"></div>
+               <div className="w-2/3 h-4 bg-slate-200 rounded-full animate-pulse mb-4"></div>
+               <div className="mt-auto flex flex-col gap-1">
+                 <div className="w-12 h-3 bg-slate-200 rounded-full animate-pulse"></div>
+                 <div className="w-20 h-5 bg-slate-200 rounded-full animate-pulse"></div>
+                 <div className="w-full h-8 bg-slate-100 rounded-xl animate-pulse mt-2"></div>
+               </div>
+             </div>
+          ))}
+        </div>
       </div>
     );
   }
@@ -114,6 +143,11 @@ export default function OffersView({ onAddToList }: OffersViewProps) {
                   <span className="text-lg font-black text-primary-green block leading-none">
                     ${offer.price.toLocaleString('es-AR')}
                   </span>
+                  {offer.pricePerUnit && offer.unitType && (
+                    <span className="text-[9px] text-slate-500 font-bold mt-1 block">
+                      ${offer.pricePerUnit.toLocaleString('es-AR', {maximumFractionDigits: 0})} / {offer.unitType}
+                    </span>
+                  )}
                 </div>
               </div>
 
