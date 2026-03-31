@@ -53,7 +53,7 @@ export interface LocationData {
 
 export async function getSupermarketPrices(query: string, location?: LocationData): Promise<SupermarketPrice[]> {
   try {
-    let url = `https://us-central1-auraverde-db.cloudfunctions.net/getSupermarketPrices?query=${encodeURIComponent(query)}`;
+    let url = `https://us-central1-elchango-81e77.cloudfunctions.net/getSupermarketPrices?query=${encodeURIComponent(query)}`;
     if (location) {
       url += `&zipCode=${location.zipCode}&city=${encodeURIComponent(location.city)}`;
     }
@@ -114,7 +114,7 @@ export interface GuidedSearchResponse {
 
 export async function fetchSearchSuggestions(query: string, type?: string, size?: string): Promise<GuidedSearchResponse | null> {
   try {
-    let url = `https://us-central1-auraverde-db.cloudfunctions.net/getSearchSuggestions?q=${encodeURIComponent(query)}`;
+    let url = `https://us-central1-elchango-81e77.cloudfunctions.net/getSearchSuggestions?q=${encodeURIComponent(query)}`;
     if (type) url += `&type=${encodeURIComponent(type)}`;
     if (size) url += `&size=${encodeURIComponent(size)}`;
     

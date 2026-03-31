@@ -190,22 +190,24 @@ const CITY_CHAINS: Record<string, string[]> = {
 export const getSupermarketPrices = onRequest({ timeoutSeconds: 60, memory: "256MiB" }, (req, res) => {
   corsHandler(req, res, async () => {
     const q = (req.query.query || req.query.barcode) as string;
-    const city = (req.query.city as string || "").toLowerCase().trim();
-    
-    if (!q) {
-      res.status(400).json({ error: "Query or Barcode is required" });
-      return;
-    }
+    const rawCity = (req.query.city as string || "");
+    const city = rawCity.toLowerCase().trim()
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // Quitar acentos
+      .replace(/, .+$/, ""); // Quitar sufijos como ", Provincia de..."
 
-    logger.info(`Buscando [${q}] en [${city || 'ubicación por defecto'}]`);
+    logger.info(`Buscando [${q}] en [${rawCity}] -> Normalizada: [${city}]`);
 
     // Determinar qué cadenas buscar basándonos en la ciudad
     let allowedChains = CITY_CHAINS[city] || CITY_CHAINS["default"];
     
-    // Si la ciudad contiene "bahia blanca", forzamos el filtrado estricto
-    if (city.includes("bahia blanca")) {
-      allowedChains = CITY_CHAINS["bahia blanca"];
+    // Fallback para variaciones comunes
+    if (!CITY_CHAINS[city]) {
+      if (city.includes("bahia blanca")) allowedChains = CITY_CHAINS["bahia blanca"];
+      else if (city.includes("mar del plata")) allowedChains = CITY_CHAINS["mar del plata"];
+      else if (city.includes("rosario")) allowedChains = CITY_CHAINS["rosario"];
     }
+
+    logger.info(`Cadenas permitidas para [${city}]: ${JSON.stringify(allowedChains)}`);
 
     try {
       const fetchers: Promise<any[]>[] = [];

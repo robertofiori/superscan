@@ -170,7 +170,8 @@ async function fetchCoope(query) {
 const CITY_CHAINS = {
     "default": ["carrefour", "masonline", "vea", "lacoope", "dia", "coto"],
     "bahia blanca": ["carrefour", "masonline", "vea", "lacoope", "dia", "coto"],
-    "mar del plata": ["carrefour", "masonline", "vea", "lacoope", "dia", "coto", "disco", "toledo"],
+    "mar del plata": ["carrefour", "masonline", "vea", "dia", "coto", "disco", "toledo"],
+    "rosario": ["carrefour", "masonline", "vea", "dia", "coto", "disco"],
     "caba": ["carrefour", "masonline", "vea", "lacoope", "dia", "coto", "disco"],
     "neuquen": ["carrefour", "laanonima", "vea", "lacoope", "dia"],
     "bariloche": ["carrefour", "laanonima", "todo", "vea"]
@@ -178,18 +179,23 @@ const CITY_CHAINS = {
 exports.getSupermarketPrices = (0, https_1.onRequest)({ timeoutSeconds: 60, memory: "256MiB" }, (req, res) => {
     corsHandler(req, res, async () => {
         const q = (req.query.query || req.query.barcode);
-        const city = (req.query.city || "").toLowerCase().trim();
-        if (!q) {
-            res.status(400).json({ error: "Query or Barcode is required" });
-            return;
-        }
-        logger.info(`Buscando [${q}] en [${city || 'ubicación por defecto'}]`);
+        const rawCity = (req.query.city || "");
+        const city = rawCity.toLowerCase().trim()
+            .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // Quitar acentos
+            .replace(/, .+$/, ""); // Quitar sufijos como ", Provincia de..."
+        logger.info(`Buscando [${q}] en [${rawCity}] -> Normalizada: [${city}]`);
         // Determinar qué cadenas buscar basándonos en la ciudad
         let allowedChains = CITY_CHAINS[city] || CITY_CHAINS["default"];
-        // Si la ciudad contiene "bahia blanca", forzamos el filtrado estricto
-        if (city.includes("bahia blanca")) {
-            allowedChains = CITY_CHAINS["bahia blanca"];
+        // Fallback para variaciones comunes
+        if (!CITY_CHAINS[city]) {
+            if (city.includes("bahia blanca"))
+                allowedChains = CITY_CHAINS["bahia blanca"];
+            else if (city.includes("mar del plata"))
+                allowedChains = CITY_CHAINS["mar del plata"];
+            else if (city.includes("rosario"))
+                allowedChains = CITY_CHAINS["rosario"];
         }
+        logger.info(`Cadenas permitidas para [${city}]: ${JSON.stringify(allowedChains)}`);
         try {
             const fetchers = [];
             if (allowedChains.includes("carrefour"))

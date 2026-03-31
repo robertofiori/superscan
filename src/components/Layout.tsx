@@ -1,4 +1,4 @@
-import { Search, Tag, ListOrdered, User, MapPin, Camera } from 'lucide-react';
+import { Search, Tag, ListOrdered, User, MapPin, Barcode } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import LocationModal from './LocationModal';
 
@@ -143,7 +143,7 @@ const Layout: React.FC<LayoutProps> = ({
             onClick={() => onViewChange('profile')}
           />
           <NavItem
-            icon={<Camera size={22} />}
+            icon={<Barcode size={22} />}
             isActive={false}
             onClick={onScan}
           />
