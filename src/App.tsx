@@ -65,6 +65,7 @@ const AppContent = () => {
   const [activeView, setActiveView] = useState('home');
   const [scanning, setScanning] = useState(false);
   const [listItems, setListItems] = useState<ShoppingListItem[]>([]);
+  const [showLocationModal, setShowLocationModal] = useState(false);
   
   const [lastScannedCode, setLastScannedCode] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -224,7 +225,13 @@ const AppContent = () => {
 
     switch (activeView) {
       case 'home':
-        return <HomeView onSearch={handleSearch} onScan={() => setScanning(true)} onViewChange={handleViewChange} />;
+        return (
+          <HomeView 
+            onSearch={handleSearch} 
+            onViewChange={handleViewChange} 
+            onShowLocation={() => setShowLocationModal(true)}
+          />
+        );
       case 'results':
         return product ? (
           <ResultsView 
@@ -233,7 +240,13 @@ const AppContent = () => {
             onAddToList={handleAddToList} 
             onBack={() => setActiveView('home')} 
           />
-        ) : <HomeView onSearch={handleSearch} onScan={() => setScanning(true)} onViewChange={handleViewChange} />;
+        ) : (
+          <HomeView 
+            onSearch={handleSearch} 
+            onViewChange={handleViewChange} 
+            onShowLocation={() => setShowLocationModal(true)}
+          />
+        );
       case 'list':
         return (
           <ListView 
@@ -261,12 +274,26 @@ const AppContent = () => {
       case 'offers':
         return <OffersView onAddToList={handleAddToList} />;
       default:
-        return <HomeView onSearch={handleSearch} onScan={() => setScanning(true)} onViewChange={handleViewChange} />;
+        return (
+          <HomeView 
+            onSearch={handleSearch} 
+            onViewChange={handleViewChange} 
+            onShowLocation={() => setShowLocationModal(true)}
+          />
+        );
     }
   };
 
   return (
-    <Layout activeView={activeView} onViewChange={handleViewChange} cartCount={listItems.length}>
+    <Layout 
+      activeView={activeView} 
+      onViewChange={handleViewChange} 
+      cartCount={listItems.length}
+      onScan={() => setScanning(true)}
+      showLocationModal={showLocationModal}
+      onShowLocation={() => setShowLocationModal(true)}
+      onCloseLocation={() => setShowLocationModal(false)}
+    >
       {renderView()}
       {scanning && (
         <Scanner onClose={() => setScanning(false)} onScanSuccess={handleScanSuccess} />

@@ -1,6 +1,5 @@
-import { Search, Tag, ListOrdered, User, MapPin } from 'lucide-react';
+import { Search, Tag, ListOrdered, User, MapPin, Camera } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { useState } from 'react';
 import LocationModal from './LocationModal';
 
 interface LayoutProps {
@@ -8,11 +7,23 @@ interface LayoutProps {
   activeView: string;
   onViewChange: (view: string, tab?: 'settings' | 'payments') => void;
   cartCount: number;
+  onScan: () => void;
+  showLocationModal: boolean;
+  onShowLocation: () => void;
+  onCloseLocation: () => void;
 }
 
-const Layout: React.FC<LayoutProps> = ({ children, activeView, onViewChange, cartCount }) => {
+const Layout: React.FC<LayoutProps> = ({ 
+  children, 
+  activeView, 
+  onViewChange, 
+  cartCount, 
+  onScan, 
+  showLocationModal, 
+  onShowLocation, 
+  onCloseLocation 
+}) => {
   const { user, userData } = useAuth();
-  const [showLocationModal, setShowLocationModal] = useState(false);
   const avatarUrl = userData?.avatarUrl || user?.photoURL;
   return (
     <div className="min-h-screen pb-24 bg-background-soft text-text-dark font-sans">
@@ -32,7 +43,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeView, onViewChange, car
           
           {/* Ubicación (Escritorio) */}
           <button 
-            onClick={() => setShowLocationModal(true)}
+            onClick={onShowLocation}
             className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 hover:bg-slate-100 rounded-full transition-all border border-slate-100 group min-h-[40px]"
           >
             <div className="w-7 h-7 bg-white rounded-full flex items-center justify-center text-primary-green shadow-sm group-hover:scale-110 transition-transform">
@@ -83,32 +94,11 @@ const Layout: React.FC<LayoutProps> = ({ children, activeView, onViewChange, car
 
       {/* Contenido Principal */}
       <main className="pt-4 sm:pt-20 px-4 max-w-screen-xl mx-auto">
-        {/* Ubicación Mobile - Siempre visible al inicio */}
-        <div className="sm:hidden mb-6 mt-1">
-           <button 
-            onClick={() => setShowLocationModal(true)}
-            className="w-full flex items-center justify-between p-4 bg-white rounded-[28px] shadow-sm border border-slate-100 active:scale-[0.98] transition-all"
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-green-50 text-primary-green rounded-2xl flex items-center justify-center">
-                <MapPin size={20} />
-              </div>
-              <div className="flex flex-col items-start">
-                <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Ubicación Actual</span>
-                <span className="text-base font-black text-slate-800">
-                  {userData?.location?.city || 'Seleccionar Ciudad'}
-                </span>
-              </div>
-            </div>
-            <div className="bg-slate-50 px-3 py-1.5 rounded-xl text-[10px] font-black text-primary-green uppercase tracking-wider">
-              Cambiar
-            </div>
-          </button>
-        </div>
+        {/* Ubicación Mobile se movió a HomeView */}
         {children}
       </main>
 
-      {showLocationModal && <LocationModal onClose={() => setShowLocationModal(false)} />}
+      {showLocationModal && <LocationModal onClose={onCloseLocation} />}
 
       {/* Modern Bottom Navigation Bar */}
       <nav className="fixed bottom-0 left-0 right-0 px-4 pb-6 pt-2 bg-gradient-to-t from-white via-white to-transparent pointer-events-none z-50">
@@ -152,9 +142,11 @@ const Layout: React.FC<LayoutProps> = ({ children, activeView, onViewChange, car
             isActive={activeView === 'profile'}
             onClick={() => onViewChange('profile')}
           />
-           <div className="w-12 h-12 flex items-center justify-center sm:hidden">
-              {/* Espaciador para mantener simetría si es necesario */}
-           </div>
+          <NavItem
+            icon={<Camera size={22} />}
+            isActive={false}
+            onClick={onScan}
+          />
         </div>
       </nav>
 

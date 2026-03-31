@@ -180,7 +180,8 @@ async function fetchCoope(query: string): Promise<any[]> {
 const CITY_CHAINS: Record<string, string[]> = {
   "default": ["carrefour", "masonline", "vea", "lacoope", "dia", "coto"],
   "bahia blanca": ["carrefour", "masonline", "vea", "lacoope", "dia", "coto"],
-  "mar del plata": ["carrefour", "masonline", "vea", "lacoope", "dia", "coto", "disco", "toledo"],
+  "mar del plata": ["carrefour", "masonline", "vea", "dia", "coto", "disco", "toledo"],
+  "rosario": ["carrefour", "masonline", "vea", "dia", "coto", "disco"],
   "caba": ["carrefour", "masonline", "vea", "lacoope", "dia", "coto", "disco"],
   "neuquen": ["carrefour", "laanonima", "vea", "lacoope", "dia"],
   "bariloche": ["carrefour", "laanonima", "todo", "vea"]

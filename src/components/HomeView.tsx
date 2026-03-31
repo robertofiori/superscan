@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Camera, Zap, ArrowRight, ShoppingBag, CreditCard, ChevronRight, Gift } from 'lucide-react';
+import { Zap, ArrowRight, ShoppingBag, CreditCard, ChevronRight, Gift, MapPin } from 'lucide-react';
 import AutocompleteSearch from './AutocompleteSearch';
 import { fetchDailyOffers, type SupermarketPrice } from '../api';
 import { useAuth } from '../contexts/AuthContext';
@@ -59,11 +59,11 @@ const BANK_PROMOS = [
 
 interface HomeViewProps {
   onSearch: (query: string) => void;
-  onScan: () => void;
   onViewChange: (view: string, tab?: 'settings' | 'payments') => void;
+  onShowLocation: () => void;
 }
 
-const HomeView: React.FC<HomeViewProps> = ({ onSearch, onScan, onViewChange }) => {
+const HomeView: React.FC<HomeViewProps> = ({ onSearch, onViewChange, onShowLocation }) => {
   const { userData } = useAuth();
   const [offers, setOffers] = useState<SupermarketPrice[]>([]);
   const [loading, setLoading] = useState(true);
@@ -148,19 +148,28 @@ const HomeView: React.FC<HomeViewProps> = ({ onSearch, onScan, onViewChange }) =
               <AutocompleteSearch onSearch={onSearch} />
             </div>
 
-            <div className="flex items-center w-full gap-4 text-slate-100">
-              <div className="h-[1px] mb-[1px] bg-slate-100 flex-1"></div>
-              <span className="text-[10px] font-black uppercase tracking-widest text-slate-300">O usa tu cámara</span>
-              <div className="h-[1px] mb-[1px] bg-slate-100 flex-1"></div>
+            {/* Selector de Ubicación (Móvil) */}
+            <div className="sm:hidden w-full">
+              <button 
+                onClick={onShowLocation}
+                className="w-full flex items-center justify-between p-3.5 bg-slate-50 rounded-2xl border border-slate-100 hover:bg-slate-100 active:scale-[0.98] transition-all group"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 bg-white text-primary-green rounded-xl flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform">
+                    <MapPin size={18} />
+                  </div>
+                  <div className="flex flex-col items-start leading-tight">
+                    <span className="text-[9px] text-slate-400 font-black uppercase tracking-widest">Ubicación Actual</span>
+                    <span className="text-sm font-black text-slate-800">
+                      {userData?.location?.city || 'Seleccionar Ciudad'}
+                    </span>
+                  </div>
+                </div>
+                <div className="bg-white px-3 py-1.5 rounded-xl text-[10px] font-black text-primary-green border border-slate-100 uppercase tracking-wider shadow-sm">
+                  Cambiar
+                </div>
+              </button>
             </div>
-
-            <button
-              onClick={onScan}
-              className="w-full bg-slate-900 hover:bg-black text-white font-black flex items-center justify-center gap-2 py-3.5 rounded-2xl shadow-lg transition-all active:scale-95 group"
-            >
-              <Camera size={20} className="group-hover:rotate-12 transition-transform" />
-              <span className="text-sm">Escanear Producto</span>
-            </button>
           </div>
         </div>
       </section>
