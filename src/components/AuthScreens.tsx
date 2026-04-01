@@ -14,7 +14,7 @@ export const LandingScreen = ({ onNavigate }: { onNavigate: () => void }) => {
             {/* Logo */}
             <div className="w-[100px] min-[400px]:w-[130px] sm:w-[160px] shrink-0 relative z-10 transition-all duration-300 -mr-2 sm:-mr-4">
               <img
-                src="Elmango logo.svg"
+                src="/elmango-logo.svg"
                 alt="ElMango Logo"
                 className="w-full h-auto object-contain drop-shadow-md scale-[1.4] min-[400px]:scale-[1.5] sm:scale-[1.6] origin-right"
               />

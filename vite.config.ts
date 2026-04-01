@@ -5,7 +5,7 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 // https://vite.dev/config/
 export default defineConfig({
-  base: '/superscan/',
+  base: process.env.NODE_ENV === 'production' ? '/superscan/' : '/',
   plugins: [
     react(), 
     tailwindcss(),
