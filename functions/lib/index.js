@@ -66,64 +66,9 @@ async function fetchVtex(storeName, domain, query) {
         }];
 }
 async function fetchCoto(query) {
-    var _a;
-    try {
-        // API de Coto Digital basada en Constructor.io (BFF)
-        // Usamos la sucursal 200 (CABA/Zona Norte) por defecto para disponibilidad
-        const key = 'key_r6xzz4IAoTWcipni';
-        const storeId = '200';
-        const filter = encodeURIComponent(JSON.stringify({ name: "store_availability", value: storeId }));
-        const url = `https://api.coto.com.ar/api/v1/ms-digital-sitio-bff-web/api/v1/products/search/${encodeURIComponent(query)}?key=${key}&num_results_per_page=12&pre_filter_expression=${filter}`;
-        const { data } = await axios_1.default.get(url, {
-            headers: {
-                'Accept': 'application/json',
-                'Origin': 'https://www.cotodigital.com.ar',
-                'Referer': 'https://www.cotodigital.com.ar/',
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-            },
-            timeout: 12000
-        });
-        if (((_a = data === null || data === void 0 ? void 0 : data.response) === null || _a === void 0 ? void 0 : _a.results) && data.response.results.length > 0) {
-            const results = [];
-            const topProducts = data.response.results.slice(0, 3);
-            for (const product of topProducts) {
-                const pData = product.data;
-                if (pData) {
-                    const price = parseFloat(pData.price) || 0;
-                    const listPrice = parseFloat(pData.list_price) || price;
-                    const isOffer = listPrice > price;
-                    results.push({
-                        id: "coto",
-                        name: "Coto Digital",
-                        price,
-                        inStock: true, // Si aparece en la búsqueda con filtro de disponibilidad, asumimos stock
-                        url: pData.url || `https://www.cotodigital.com.ar/sitios/cdigi/productos/${product.value.toLowerCase().replace(/ /g, '-')}`,
-                        originalPrice: listPrice,
-                        isOffer,
-                        imageUrl: pData.image_url || '',
-                        productName: product.value || 'Producto Coto',
-                        brand: pData.brand || ''
-                    });
-                }
-            }
-            return results;
-        }
-    }
-    catch (error) {
-        logger.error(`[Coto] Error on API:`, error.message);
-    }
-    return [{
-            id: "coto",
-            name: "Coto Digital",
-            price: 0,
-            inStock: false,
-            url: '',
-            originalPrice: 0,
-            isOffer: false,
-            imageUrl: '',
-            productName: 'Producto no disponible',
-            brand: ''
-        }];
+    // Coto no es VTEX, requiere scraping o una API específica.
+    // Por ahora devolvemos un placeholder vacío para evitar errores.
+    return [];
 }
 async function getCoopeSession() {
     try {
