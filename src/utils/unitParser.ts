@@ -5,60 +5,80 @@ export interface UnitInfo {
 
 export function parseUnitInfo(name: string): UnitInfo | null {
   if (!name) return null;
-  const normalizedName = name.toLowerCase();
+  // Normalize string for consistent matching
+  const normalizedName = name.toLowerCase().replace(/\s+/g, ' ');
 
-  // Try to find L / Litros
-  const lMatch = normalizedName.match(/(\d+(?:[.,]\d+)?)\s*(?:l|lt|litro|litros)\b/);
-  if (lMatch) {
-    return {
-      normalizedSize: parseFloat(lMatch[1].replace(',', '.')),
-      unitLabel: 'L',
-    };
-  }
-
-  // Try to find ML / CC / CM3 (Convert to Liters)
-  const mlMatch = normalizedName.match(/(\d+(?:[.,]\d+)?)\s*(?:ml|militros|cc|cm3|cm³)\b/);
+  // 1. Try to find ML / CC / CM3 (Convert to Liters) - Priority for liquid units
+  const mlMatch = normalizedName.match(/(\d+(?:[.,]\d+)?)\s*(?:ml|militros|milis|cc|cm3|cm³)\b/);
   if (mlMatch) {
-    return {
-      normalizedSize: parseFloat(mlMatch[1].replace(',', '.')) / 1000,
-      unitLabel: 'L',
-    };
+    const value = parseFloat(mlMatch[1].replace(',', '.'));
+    if (value > 0) {
+      return {
+        normalizedSize: value / 1000,
+        unitLabel: 'L',
+      };
+    }
   }
 
-  // Try to find KG / Kilos
-  const kgMatch = normalizedName.match(/(\d+(?:[.,]\d+)?)\s*(?:kg|kilo|kilos)\b/);
-  if (kgMatch) {
-    return {
-      normalizedSize: parseFloat(kgMatch[1].replace(',', '.')),
-      unitLabel: 'Kg',
-    };
+  // 2. Try to find L / Litros
+  const lMatch = normalizedName.match(/(\d+(?:[.,]\d+)?)\s*(?:l|lt|lts|litro|litros)\b/);
+  if (lMatch) {
+    const value = parseFloat(lMatch[1].replace(',', '.'));
+    if (value > 0) {
+      return {
+        normalizedSize: value,
+        unitLabel: 'L',
+      };
+    }
   }
 
-  // Try to find G / GR / Gramos (Convert to Kg)
+  // 3. Try to find G / GR / Gramos (Convert to Kg)
   const gMatch = normalizedName.match(/(\d+(?:[.,]\d+)?)\s*(?:g|gr|grs|gramo|gramos)\b/);
   if (gMatch) {
-    return {
-      normalizedSize: parseFloat(gMatch[1].replace(',', '.')) / 1000,
-      unitLabel: 'Kg',
-    };
+    const value = parseFloat(gMatch[1].replace(',', '.'));
+    if (value > 0) {
+      // Small optimization: if it's explicitly "g" but a large number, it's likely correct
+      return {
+        normalizedSize: value / 1000,
+        unitLabel: 'Kg',
+      };
+    }
   }
 
-  // Try to find Units (e.g., "Pack 6u", "X4", "6 Unidades")
-  // Only match numbers directly followed by 'u' or prefixed by 'x'.  More complex logic can be added later if needed.
-  const packMatch = normalizedName.match(/(?:pack|caja|bolsa)?\s*(?:de\s*)?(\d+)\s*(?:u|unidades|unr)\b/);
-  if (packMatch) {
+  // 4. Try to find KG / Kilos
+  const kgMatch = normalizedName.match(/(\d+(?:[.,]\d+)?)\s*(?:kg|kilo|kilos|k)\b/);
+  if (kgMatch) {
+    const value = parseFloat(kgMatch[1].replace(',', '.'));
+    if (value > 0) {
       return {
-          normalizedSize: parseInt(packMatch[1], 10),
-          unitLabel: 'u'
-      }
+        normalizedSize: value,
+        unitLabel: 'Kg',
+      };
+    }
+  }
+
+  // 5. Try to find Units (e.g., "Pack 6u", "X4", "6 Unidades")
+  const packMatch = normalizedName.match(/(?:pack|caja|bolsa)?\s*(?:de\s*)?(\d+)\s*(?:u|un|uni|unr|unidades|unid)\b/);
+  if (packMatch) {
+    const value = parseInt(packMatch[1], 10);
+    if (value > 0) {
+      return {
+        normalizedSize: value,
+        unitLabel: 'u'
+      };
+    }
   }
   
-  const xMatch = normalizedName.match(/\bx\s*(\d+)\b/); // Matches " x 6 " or "x6"
+  // Specific catch for isolated "x 6" or similar
+  const xMatch = normalizedName.match(/\bx\s*(\d+)\b/);
   if (xMatch) {
+    const value = parseInt(xMatch[1], 10);
+    if (value > 0) {
       return {
-          normalizedSize: parseInt(xMatch[1], 10),
-          unitLabel: 'u'
-      }
+        normalizedSize: value,
+        unitLabel: 'u'
+      };
+    }
   }
 
   return null;

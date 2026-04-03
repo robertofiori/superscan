@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { ShoppingBag, AlertCircle, ExternalLink, Search, ArrowDownUp, Tag } from 'lucide-react';
 import { type ProductData, type SupermarketPrice } from '../api';
+import { useAuth } from '../contexts/AuthContext';
+import { getApplicableDiscount } from '../data/bankDiscounts';
 
 interface ProductResultProps {
   product: ProductData;
@@ -9,10 +11,10 @@ interface ProductResultProps {
   onScanAnother: () => void;
 }
 
-import { parseUnitInfo } from '../utils/unitParser';
 
 export default function ProductResult({ product, prices, onAddToList, onScanAnother }: ProductResultProps) {
-  const [sortBy, setSortBy] = useState<'price' | 'size'>('price');
+  const { userData } = useAuth();
+  const [sortBy, setSortBy] = useState<'price' | 'unitPrice'>('unitPrice');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [onlyOffers, setOnlyOffers] = useState(false);
 
@@ -23,21 +25,26 @@ export default function ProductResult({ product, prices, onAddToList, onScanAnot
     if (a.inStock && !b.inStock) return -1;
     
     let comparison = 0;
-    if (sortBy === 'price') {
-      comparison = a.price - b.price;
-    } else {
-      const sizeA = parseUnitInfo(a.productName || '')?.normalizedSize || 0;
-      const sizeB = parseUnitInfo(b.productName || '')?.normalizedSize || 0;
-      // If sizes are identical, sort by price naturally ascending
-      if (sizeA === sizeB) {
-        return a.price - b.price;
+    if (sortBy === 'unitPrice') {
+      // If both have unit prices, compare them
+      if (a.pricePerUnit != null && b.pricePerUnit != null && a.unitType === b.unitType) {
+        comparison = a.pricePerUnit - b.pricePerUnit;
+      } else {
+        // Fallback to absolute price if units don't match or are missing
+        comparison = a.price - b.price;
       }
-      comparison = sizeA - sizeB;
+    } else {
+      comparison = a.price - b.price;
     }
     
     return sortOrder === 'asc' ? comparison : -comparison;
   });
   
+  // The truly "Best Option" is the one with lowest unit price if available
+  const bestValueItem = [...prices]
+    .filter(p => p.inStock && p.price > 0 && p.pricePerUnit != null)
+    .sort((a, b) => (a.pricePerUnit || 0) - (b.pricePerUnit || 0))[0];
+
   const minPrice = sortedPrices.find(p => p.inStock) || sortedPrices[0];
   const queryName = product.product_name?.replace('Búsqueda: ', '') || 'Producto Desconocido';
 
@@ -66,6 +73,20 @@ export default function ProductResult({ product, prices, onAddToList, onScanAnot
           <div className="flex border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden shadow-sm bg-white dark:bg-slate-900">
             <button 
               onClick={() => {
+                if (sortBy === 'unitPrice') {
+                  setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+                } else {
+                  setSortBy('unitPrice');
+                  setSortOrder('asc');
+                }
+              }}
+              className={`px-3 py-1.5 text-[11px] font-bold transition-colors flex items-center gap-1 min-w-[90px] justify-center ${sortBy === 'unitPrice' ? 'bg-primary text-white shadow-inner' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+            >
+              Rinde Más {sortBy === 'unitPrice' && (sortOrder === 'asc' ? '↑' : '↓')}
+            </button>
+            <div className="w-px bg-slate-200 dark:bg-slate-700"></div>
+            <button 
+              onClick={() => {
                 if (sortBy === 'price') {
                   setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
                 } else {
@@ -76,20 +97,6 @@ export default function ProductResult({ product, prices, onAddToList, onScanAnot
               className={`px-3 py-1.5 text-[11px] font-bold transition-colors flex items-center gap-1 min-w-[80px] justify-center ${sortBy === 'price' ? 'bg-primary text-white shadow-inner' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
             >
               Precio {sortBy === 'price' && (sortOrder === 'asc' ? '↑' : '↓')}
-            </button>
-            <div className="w-px bg-slate-200 dark:bg-slate-700"></div>
-            <button 
-              onClick={() => {
-                if (sortBy === 'size') {
-                  setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-                } else {
-                  setSortBy('size');
-                  setSortOrder('desc'); // Default to largest first when switching to size
-                }
-              }}
-              className={`px-3 py-1.5 text-[11px] font-bold transition-colors flex items-center gap-1 min-w-[80px] justify-center ${sortBy === 'size' ? 'bg-primary text-white shadow-inner' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
-            >
-              Tamaño {sortBy === 'size' && (sortOrder === 'asc' ? '↑' : '↓')}
             </button>
           </div>
 
@@ -110,6 +117,11 @@ export default function ProductResult({ product, prices, onAddToList, onScanAnot
       <div className="space-y-3 mb-6 lg:max-h-[50vh] overflow-y-auto pr-1">
         {sortedPrices.length > 0 ? (
           sortedPrices.map((p) => {
+            const discountInfo = getApplicableDiscount(p.supermarket, userData?.paymentMethods || []);
+            const effectivePrice = discountInfo 
+              ? p.price * (1 - discountInfo.discount)
+              : p.price;
+            
             const isBest = p.id === minPrice?.id && p.inStock && p.price === minPrice.price;
             return (
               <div 
@@ -123,8 +135,13 @@ export default function ProductResult({ product, prices, onAddToList, onScanAnot
                     <span className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-[10px] font-bold uppercase tracking-wider rounded-md text-slate-600 dark:text-slate-300">
                       {p.supermarket}
                     </span>
-                    {isBest && p.inStock && (
-                      <span className="text-[10px] text-primary bg-primary/10 px-2 py-0.5 rounded-md font-bold uppercase tracking-wider border border-primary/20">🏆 Mejor Opción</span>
+                    {p.id === bestValueItem?.id && (
+                      <span className="text-[10px] text-emerald-600 bg-emerald-50 dark:bg-emerald-500/10 px-2 py-0.5 rounded-md font-bold uppercase tracking-wider border border-emerald-200 dark:border-emerald-500/20 flex items-center gap-1">
+                         🌟 Rinde Más
+                      </span>
+                    )}
+                    {isBest && p.id !== bestValueItem?.id && (
+                      <span className="text-[10px] text-primary bg-primary/10 px-2 py-0.5 rounded-md font-bold uppercase tracking-wider border border-primary/20">💰 Más Barato</span>
                     )}
                     {!p.inStock && (
                        <span className="text-[10px] text-red-500 font-bold uppercase tracking-wider flex items-center gap-1">
@@ -168,9 +185,23 @@ export default function ProductResult({ product, prices, onAddToList, onScanAnot
                       )}
                       
                       {p.pricePerUnit && p.unitType && (
-                        <span className="text-[10px] text-slate-500 font-bold mt-0.5">
-                          ${p.pricePerUnit.toLocaleString('es-AR', {maximumFractionDigits: 0})} / {p.unitType}
-                        </span>
+                        <div className="flex flex-col items-end mt-0.5">
+                          <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-black">
+                            ${p.pricePerUnit.toLocaleString('es-AR', {maximumFractionDigits: 0})} / {p.unitType}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Info de Descuento Bancario */}
+                      {discountInfo && (
+                        <div className="mt-1 flex flex-col items-end">
+                          <div className="flex items-center gap-1 bg-primary/10 border border-primary/20 px-1.5 py-0.5 rounded text-[9px] font-black text-primary">
+                            {discountInfo.name} -{(discountInfo.discount * 100).toFixed(0)}%
+                          </div>
+                          <span className="text-xs font-black text-emerald-600 dark:text-emerald-400 mt-0.5">
+                            Pagas: ${effectivePrice.toLocaleString('es-AR', {maximumFractionDigits: 0})}
+                          </span>
+                        </div>
                       )}
                       
                       {p.inStock && (

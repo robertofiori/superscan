@@ -1,77 +1,87 @@
 import type { ShoppingListItem } from '../api';
+import { getApplicableDiscount } from '../data/bankDiscounts';
 
 export interface SupermarketTotal {
   supermarket: string;
-  total: number;
+  total: number;           // Real total of found items
+  estimatedTotal: number;  // Total + estimated cost of missing items
   itemCount: number;
   missingItems: number;
+  matchPercentage: number; // Percentage of items from list found in this store
   savingsVsCurrent: number;
 }
 
 export interface OptimizationResults {
   totalsPerSupermarket: SupermarketTotal[];
-  theoreticalMin: number; // Minimum price if shopping at multiple stores
+  theoreticalMin: number;
   currentTotal: number;
   bestSupermarket: SupermarketTotal | null;
 }
 
-export const calculateOptimization = (items: ShoppingListItem[]): OptimizationResults => {
+export const calculateOptimization = (items: ShoppingListItem[], userBanks: string[] = []): OptimizationResults => {
   if (items.length === 0) {
     return { totalsPerSupermarket: [], theoreticalMin: 0, currentTotal: 0, bestSupermarket: null };
   }
 
-  // 1. Get unique supermarkets from all items
   const allSupermarkets = new Set<string>();
   items.forEach(item => {
     item.allPrices?.forEach(p => allSupermarkets.add(p.supermarket));
-    // Also include the current supermarket just in case
     allSupermarkets.add(item.price.supermarket);
   });
 
   const supermarketList = Array.from(allSupermarkets);
   const currentTotal = items.reduce((sum, item) => sum + item.price.price * item.quantity, 0);
-
-  // 2. Calculate total for each supermarket
+  
   const totalsPerSupermarket: SupermarketTotal[] = supermarketList.map(sm => {
     let total = 0;
     let itemCount = 0;
     let missingItems = 0;
 
     items.forEach(item => {
-      // Find this product's price in this specific supermarket
       const priceInSm = item.allPrices?.find(p => p.supermarket === sm && p.inStock);
       
       if (priceInSm) {
         total += priceInSm.price * item.quantity;
         itemCount++;
       } else {
-        // If not found in comparison, but the item *was* added from this supermarket originally
         if (item.price.supermarket === sm) {
             total += item.price.price * item.quantity;
             itemCount++;
         } else {
+            // Fair comparison: Use the average price of THIS specific item from other stores
+            // fall back to current price if no other prices available
+            const otherPrices = (item.allPrices || []).filter(p => p.inStock && p.price > 0);
+            const itemAvgPrice = otherPrices.length > 0 
+              ? otherPrices.reduce((sum, p) => sum + p.price, 0) / otherPrices.length
+              : item.price.price;
+            
+            total += itemAvgPrice * item.quantity;
             missingItems++;
         }
       }
     });
 
+    const matchPercentage = Math.round((itemCount / items.length) * 100);
+    const discountInfo = getApplicableDiscount(sm, userBanks);
+    const effectiveTotal = discountInfo 
+      ? total * (1 - discountInfo.discount)
+      : total;
+
     return {
       supermarket: sm,
-      total,
+      total: effectiveTotal, // Now it's the effective total!
+      estimatedTotal: effectiveTotal,
       itemCount,
       missingItems,
-      savingsVsCurrent: currentTotal - total
+      matchPercentage,
+      savingsVsCurrent: currentTotal - effectiveTotal
     };
   });
 
-  // Sort by total (cheapest first)
-  totalsPerSupermarket.sort((a, b) => {
-    // Prioritize stores that have more items from the list
-    if (a.missingItems !== b.missingItems) return a.missingItems - b.missingItems;
-    return a.total - b.total;
-  });
+  // Sort by estimated total (cheapest first)
+  // We no longer strictly prioritize missing items count because estimatedTotal handles the "penalty"
+  totalsPerSupermarket.sort((a, b) => a.estimatedTotal - b.estimatedTotal);
 
-  // 3. Calculate theoretical minimum (best price for each item individually)
   const theoreticalMin = items.reduce((sum, item) => {
     const validPrices = (item.allPrices || []).filter(p => p.inStock && p.price > 0);
     const bestPrice = validPrices.length > 0 
@@ -87,3 +97,4 @@ export const calculateOptimization = (items: ShoppingListItem[]): OptimizationRe
     bestSupermarket: totalsPerSupermarket.length > 0 ? totalsPerSupermarket[0] : null
   };
 };
+

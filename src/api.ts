@@ -53,17 +53,17 @@ export interface LocationData {
 
 export async function getSupermarketPrices(query: string, location?: LocationData): Promise<SupermarketPrice[]> {
   try {
-    let url = `https://us-central1-elchango-81e77.cloudfunctions.net/getSupermarketPrices?query=${encodeURIComponent(query)}`;
+    let url = `https://getsupermarketprices-4glajx37za-uc.a.run.app?query=${encodeURIComponent(query)}`;
     if (location) {
       url += `&zipCode=${location.zipCode}&city=${encodeURIComponent(location.city)}`;
     }
     const res = await fetch(url);
-    if (!res.ok) throw new Error("Network response was not ok");
+    if (!res.ok) throw new Error(`API Error ${res.status}: ${res.statusText}`);
     
     const data = await res.json();
     
     // Filtramos y adaptamos el campo name -> supermarket
-    const validPrices: SupermarketPrice[] = data
+    let validPrices: SupermarketPrice[] = data
       .filter((item: any) => item != null)
       .map((item: any) => {
         const unitCalc = calculatePricePerUnit(item.price, item.productName || '');
@@ -84,6 +84,15 @@ export async function getSupermarketPrices(query: string, location?: LocationDat
         };
       });
 
+    // Filtro de seguridad frontend para Bahía Blanca
+    const city = location?.city?.toLowerCase() || '';
+    if (city.includes('bahia blanca')) {
+      const allowed = ['vea', 'carrefour', 'chango mas', 'cooperativa obrera', 'la coope'];
+      validPrices = validPrices.filter(p => 
+        allowed.some(a => p.supermarket?.toLowerCase().includes(a))
+      );
+    }
+
 
     // Ordenar: primero los que tienen stock y precio > 0, de más barato a más caro.
     // Los que no tienen stock o precio 0 van al final.
@@ -92,8 +101,11 @@ export async function getSupermarketPrices(query: string, location?: LocationDat
       if (b.inStock && b.price > 0 && (!a.inStock || a.price === 0)) return 1;
       return a.price - b.price;
     });
-  } catch (error) {
-    console.error("Error fetching real prices from Firebase:", error);
+  } catch (error: any) {
+    console.error("Error fetching real prices from Firebase/CloudRun:", error);
+    if (error.name === 'TypeError' && error.message === 'Failed to fetch') {
+      console.warn("Possible CSP or Network block detected for Cloud Run domains.");
+    }
     return [];
   }
 }
@@ -114,7 +126,7 @@ export interface GuidedSearchResponse {
 
 export async function fetchSearchSuggestions(query: string, type?: string, size?: string): Promise<GuidedSearchResponse | null> {
   try {
-    let url = `https://us-central1-elchango-81e77.cloudfunctions.net/getSearchSuggestions?q=${encodeURIComponent(query)}`;
+    let url = `https://getsearchsuggestions-4glajx37za-uc.a.run.app?q=${encodeURIComponent(query)}`;
     if (type) url += `&type=${encodeURIComponent(type)}`;
     if (size) url += `&size=${encodeURIComponent(size)}`;
     
@@ -122,8 +134,11 @@ export async function fetchSearchSuggestions(query: string, type?: string, size?
     if (!res.ok) throw new Error("Error fetching suggestions");
     const data = await res.json();
     return data as GuidedSearchResponse;
-  } catch (error) {
-    console.error("Error fetching suggestions from Firebase:", error);
+  } catch (error: any) {
+    console.error("Error fetching suggestions from Firebase/CloudRun:", error);
+    if (error.name === 'TypeError' && error.message === 'Failed to fetch') {
+      console.warn("Possible CSP or Network block detected for Cloud Run domains.");
+    }
     return null;
   }
 }

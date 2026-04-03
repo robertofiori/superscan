@@ -118,7 +118,7 @@ const ResultsView: React.FC<ResultsViewProps> = ({ product, prices, onAddToList,
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {processedPrices.length > 0 ? (
           processedPrices.map((p, index) => {
-            const isBestPrice = index === 0 && p.inStock && p.price > 0 && !showOnlyOffers;
+            const isBestPrice = index === 0 && p.inStock && p.price > 0;
             
             return (
               <div 

@@ -5,6 +5,8 @@ import {
   TrendingDown, Store
 } from 'lucide-react';
 import { type ShoppingListItem, type SupermarketPrice } from '../api';
+import { useAuth } from '../contexts/AuthContext';
+import { getApplicableDiscount } from '../data/bankDiscounts';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { calculateOptimization } from '../utils/basketOptimizer';
@@ -17,7 +19,8 @@ interface ListViewProps {
 }
 
 const ListView: React.FC<ListViewProps> = ({ items, onUpdateQuantity, onUpdatePrice, onClear }) => {
-  const optimization = calculateOptimization(items);
+  const { userData } = useAuth();
+  const optimization = calculateOptimization(items, userData?.paymentMethods || []);
   
   // Group by supermarket
   const grouped = items.reduce((acc, item) => {
@@ -226,8 +229,25 @@ const ListView: React.FC<ListViewProps> = ({ items, onUpdateQuantity, onUpdatePr
                 {storeItems.map((item, idx) => {
                   const itemIndex = items.indexOf(item);
                   const betterPrice = (item.allPrices || [])
-                    .filter(p => p.inStock && p.price < item.price.price && p.price > 0)
-                    .sort((a, b) => a.price - b.price)[0];
+                    .filter(p => p.inStock && p.price > 0)
+                    .sort((a, b) => {
+                      const discA = getApplicableDiscount(a.supermarket, userData?.paymentMethods || []);
+                      const discB = getApplicableDiscount(b.supermarket, userData?.paymentMethods || []);
+                      const effA = discA ? a.price * (1 - discA.discount) : a.price;
+                      const effB = discB ? b.price * (1 - discB.discount) : b.price;
+                      
+                      // Priority: effective price
+                      return effA - effB;
+                    })[0];
+                  
+                  // Only suggest if it's actually better
+                  const discountNow = getApplicableDiscount(item.price.supermarket, userData?.paymentMethods || []);
+                  const effectiveNow = discountNow ? item.price.price * (1 - discountNow.discount) : item.price.price;
+                  
+                  const discountBetter = betterPrice ? getApplicableDiscount(betterPrice.supermarket, userData?.paymentMethods || []) : null;
+                  const effectiveBetter = betterPrice ? (discountBetter ? betterPrice.price * (1 - discountBetter.discount) : betterPrice.price) : Infinity;
+
+                  const isBetter = betterPrice && effectiveBetter < effectiveNow;
 
                   return (
                     <div key={idx} className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 flex gap-4 items-center relative">
@@ -254,9 +274,16 @@ const ListView: React.FC<ListViewProps> = ({ items, onUpdateQuantity, onUpdatePr
                               ${(item.price.price * item.quantity).toLocaleString('es-AR')}
                             </span>
                             {item.price.pricePerUnit && item.price.unitType && (
-                              <span className="text-[10px] text-slate-400 font-bold">
-                                ${item.price.pricePerUnit.toLocaleString('es-AR', {maximumFractionDigits: 0})} / {item.price.unitType}
+                              <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-black flex items-center gap-1 mt-0.5">
+                                ⚖️ ${item.price.pricePerUnit.toLocaleString('es-AR', {maximumFractionDigits: 0})} / {item.price.unitType}
                               </span>
+                            )}
+                            {/* Bank Discount Info */}
+                            {discountNow && (
+                              <div className="mt-1 flex items-center gap-1.5 bg-primary-green/5 px-2 py-0.5 rounded-lg border border-primary-green/10 self-start">
+                                <span className="text-[9px] font-black text-primary-green uppercase">{discountNow.name} -{(discountNow.discount * 100).toFixed(0)}%</span>
+                                <span className="text-xs font-black text-slate-800">${effectiveNow.toLocaleString('es-AR')}</span>
+                              </div>
                             )}
                           </div>
                           {item.price.url && (
@@ -287,13 +314,15 @@ const ListView: React.FC<ListViewProps> = ({ items, onUpdateQuantity, onUpdatePr
                         </button>
                       </div>
 
-                      {/* Better Price Suggestions */}
-                      {betterPrice && (
+                      {isBetter && (
                         <button 
                           onClick={() => onUpdatePrice(itemIndex, betterPrice)}
-                          className="absolute -top-2 right-4 bg-primary-orange text-white px-3 py-1 rounded-full text-[9px] font-black shadow-lg border-2 border-white flex items-center gap-1 active:scale-95 transition-transform"
+                          className="absolute -top-2 right-4 bg-emerald-500 text-white px-3 py-1.5 rounded-full text-[9px] font-black shadow-lg border-2 border-white flex items-center gap-2 active:scale-95 transition-transform"
                         >
-                          <TrendingDown size={10} /> BUSCAR A ${betterPrice.price}
+                          <TrendingDown size={12} /> 
+                          {betterPrice.pricePerUnit && item.price.pricePerUnit && betterPrice.pricePerUnit < item.price.pricePerUnit 
+                            ? `¡RINDE MÁS POR $${betterPrice.price}!` 
+                            : `MÁS BARATO ($${betterPrice.price})`}
                         </button>
                       )}
                     </div>

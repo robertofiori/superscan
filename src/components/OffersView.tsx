@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { ShoppingBag, Sparkles, AlertCircle, Plus } from 'lucide-react';
 import { fetchDailyOffers, type SupermarketPrice, type ProductData } from '../api';
 import { useAuth } from '../contexts/AuthContext';
+import { getApplicableDiscount } from '../data/bankDiscounts';
 
 interface OffersViewProps {
   onAddToList: (product: ProductData, bestPrice: SupermarketPrice, allPrices: SupermarketPrice[]) => void;
@@ -15,8 +16,12 @@ export default function OffersView({ onAddToList }: OffersViewProps) {
   useEffect(() => {
     let active = true;
     const loadOpts = async () => {
+      // Si no tenemos userData aún, no disparamos la carga de ofertas
+      // para evitar pedir el 'default' erróneamente
+      if (!userData?.location) return;
+
       setLoading(true);
-      const data = await fetchDailyOffers(userData?.location);
+      const data = await fetchDailyOffers(userData.location);
       if (active) {
         setOffers(data);
         setLoading(false);
@@ -24,7 +29,7 @@ export default function OffersView({ onAddToList }: OffersViewProps) {
     };
     loadOpts();
     return () => { active = false; };
-  }, []);
+  }, [userData?.location]);
 
   const handleAdd = (priceItem: SupermarketPrice) => {
     // Buscar precios del mismo producto en otras tiendas dentro de las ofertas actuales
@@ -103,11 +108,17 @@ export default function OffersView({ onAddToList }: OffersViewProps) {
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-4">
-          {offers.map((offer, idx) => (
-            <div 
-              key={`${offer.id}-${idx}`}
-              className="bg-white rounded-[24px] p-4 flex flex-col shadow-lg border border-slate-100 relative overflow-hidden group hover:shadow-xl transition-all"
-            >
+          {offers.map((offer, idx) => {
+            const discountInfo = getApplicableDiscount(offer.supermarket, userData?.paymentMethods || []);
+            const effectivePrice = discountInfo 
+              ? offer.price * (1 - discountInfo.discount)
+              : offer.price;
+
+            return (
+              <div 
+                key={`${offer.id}-${idx}`}
+                className="bg-white rounded-[24px] p-4 flex flex-col shadow-lg border border-slate-100 relative overflow-hidden group hover:shadow-xl transition-all"
+              >
               {/* Etiqueta Oferta */}
               <div className="absolute top-0 right-0 bg-yellow-400 text-yellow-900 text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-bl-xl shadow-sm z-10">
                 OFERTA
@@ -148,6 +159,18 @@ export default function OffersView({ onAddToList }: OffersViewProps) {
                       ${offer.pricePerUnit.toLocaleString('es-AR', {maximumFractionDigits: 0})} / {offer.unitType}
                     </span>
                   )}
+
+                  {/* Effective Price with Bank Discount */}
+                  {discountInfo && (
+                    <div className="mt-2 pt-2 border-t border-slate-100">
+                      <div className="flex items-center gap-1 text-[9px] font-black text-primary-green uppercase">
+                        {discountInfo.name} -{(discountInfo.discount * 100).toFixed(0)}%
+                      </div>
+                      <span className="text-xs font-black text-slate-900 block">
+                        Final: ${effectivePrice.toLocaleString('es-AR', {maximumFractionDigits: 0})}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -158,8 +181,9 @@ export default function OffersView({ onAddToList }: OffersViewProps) {
               >
                 <Plus size={14} /> Agregar
               </button>
-            </div>
-          ))}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

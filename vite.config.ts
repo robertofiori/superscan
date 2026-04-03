@@ -4,8 +4,8 @@ import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
 // https://vite.dev/config/
-export default defineConfig({
-  base: process.env.NODE_ENV === 'production' ? '/superscan/' : '/',
+export default defineConfig(({ mode }) => ({
+  base: mode === 'production' ? '/superscan/' : '/',
   plugins: [
     react(), 
     tailwindcss(),
@@ -40,4 +40,4 @@ export default defineConfig({
       }
     })
   ],
-})
+}))
