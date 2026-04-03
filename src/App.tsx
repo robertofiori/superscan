@@ -10,8 +10,8 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { fetchProductInfo, getSupermarketPrices, type ProductData, type SupermarketPrice, type ShoppingListItem } from './api';
 import { AlertCircle, RefreshCw } from 'lucide-react';
 import { LandingScreen, LoginScreen } from './components/AuthScreens';
-import { fetchUserList, saveUserList } from './services/listService';
-import React, { useRef } from 'react';
+import { saveUserList, subscribeToList, saveNamedList, deleteNamedList, renameNamedList, type SavedList } from './services/listService';
+import React from 'react';
 
 // Simple Error Boundary to catch rendering crashes
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean, error: Error | null }> {
@@ -65,6 +65,7 @@ const AppContent = () => {
   const [activeView, setActiveView] = useState('home');
   const [scanning, setScanning] = useState(false);
   const [listItems, setListItems] = useState<ShoppingListItem[]>([]);
+  const [savedLists, setSavedLists] = useState<SavedList[]>([]);
   const [showLocationModal, setShowLocationModal] = useState(false);
   
   const [lastScannedCode, setLastScannedCode] = useState<string | null>(null);
@@ -73,41 +74,68 @@ const AppContent = () => {
   const [prices, setPrices] = useState<SupermarketPrice[]>([]);
 
   const [profileInitialTab, setProfileInitialTab] = useState<'settings' | 'payments'>('settings');
-  const isInitialLoad = useRef(true);
+  const [isDataLoaded, setIsDataLoaded] = useState(false);
 
-  // Cargar lista desde Firestore al iniciar sesión
+  // Suscribirse a cambios en Firestore (Lista activa y Listas guardadas)
   useEffect(() => {
     if (!user) {
       setListItems([]);
-      isInitialLoad.current = true;
+      setSavedLists([]);
+      setIsDataLoaded(false);
       return;
     }
 
-    const loadList = async () => {
-      const savedList = await fetchUserList(user.uid);
-      if (savedList && savedList.length >= 0) {
-        setListItems(savedList);
+    // Cargar datos iniciales una sola vez para evitar bucles
+    const unsubscribe = subscribeToList(user.uid, (active, saved) => {
+      if (!isDataLoaded) {
+        setListItems(active || []);
+        setIsDataLoaded(true);
       }
-      isInitialLoad.current = false;
-    };
+      setSavedLists(saved || []);
+    });
 
-    loadList();
-  }, [user]);
+    return () => unsubscribe();
+  }, [user, isDataLoaded]);
 
-  // Guardar lista en Firestore ante cualquier cambio
+  // Guardar lista en Firestore ante cualquier cambio, pero solo después de cargar los iniciales
   useEffect(() => {
-    if (!user || isInitialLoad.current) return;
+    if (!user || !isDataLoaded) return;
 
     const timeoutId = setTimeout(() => {
       saveUserList(user.uid, listItems);
     }, 1000); // Debounce de 1 segundo
 
     return () => clearTimeout(timeoutId);
-  }, [listItems, user]);
+  }, [listItems, user, isDataLoaded]);
 
   const handleViewChange = (view: string, tab?: 'settings' | 'payments') => {
     if (tab) setProfileInitialTab(tab);
     setActiveView(view);
+  };
+
+  const handleSaveNamedList = async (name: string) => {
+    if (!user) return;
+    try {
+      await saveNamedList(user.uid, name, listItems);
+    } catch (error: any) {
+      alert(error.message || "Error al guardar la lista");
+    }
+  };
+
+  const handleDeleteNamedList = async (listId: string) => {
+    if (!user) return;
+    await deleteNamedList(user.uid, listId);
+  };
+
+  const handleRenameNamedList = async (listId: string, newName: string) => {
+    if (!user) return;
+    await renameNamedList(user.uid, listId, newName);
+  };
+
+  const handleLoadNamedList = (list: SavedList) => {
+    setListItems(list.items);
+    // Forzamos guardado inmediato en el slot "active"
+    if (user) saveUserList(user.uid, list.items);
   };
 
   // Effect to fetch data when a code is scanned or searched
@@ -153,10 +181,21 @@ const AppContent = () => {
     setLastScannedCode(code);
   };
   
-  const handleAddToList = (prod: ProductData, best: SupermarketPrice, allPrices: SupermarketPrice[]) => {
+  const handleUpdateQuantity = (itemId: string, delta: number) => {
+    setListItems(prev => {
+      return prev.map(item => {
+        if (item.id === itemId) {
+          const newQuantity = Math.min(20, item.quantity + delta);
+          return { ...item, quantity: newQuantity };
+        }
+        return item;
+      }).filter(item => item.quantity > 0);
+    });
+  };
+
+  const handleAddToList = (prod: ProductData, best: SupermarketPrice, allPrices: SupermarketPrice[], quantity: number = 1) => {
     setListItems(prev => {
       // Usar EAN o URL para unicidad absoluta del producto-oferta
-      // Si no hay EAN ni URL, usamos nombre + supermercado
       const productUniqueId = best.ean || best.url || `${best.productName}-${best.supermarket}`;
       const existingIdx = prev.findIndex(item => 
         (item.price.ean || item.price.url || `${item.price.productName}-${item.price.supermarket}`) === productUniqueId
@@ -166,7 +205,7 @@ const AppContent = () => {
         const neue = [...prev];
         neue[existingIdx] = { 
           ...neue[existingIdx], 
-          quantity: neue[existingIdx].quantity + 1,
+          quantity: neue[existingIdx].quantity + quantity,
           price: best, 
           allPrices: allPrices 
         };
@@ -177,7 +216,7 @@ const AppContent = () => {
         product: prod, 
         price: best, 
         allPrices: allPrices, 
-        quantity: 1,
+        quantity: quantity,
         checked: false
       }];
     });
@@ -198,6 +237,10 @@ const AppContent = () => {
     }
     return <LoginScreen />;
   }
+
+
+
+
 
   const renderView = () => {
     if (loading) {
@@ -233,6 +276,8 @@ const AppContent = () => {
             onSearch={handleSearch} 
             onViewChange={handleViewChange} 
             onShowLocation={() => setShowLocationModal(true)}
+            items={listItems}
+            onUpdateQuantity={handleUpdateQuantity}
           />
         );
       case 'results':
@@ -248,23 +293,16 @@ const AppContent = () => {
             onSearch={handleSearch} 
             onViewChange={handleViewChange} 
             onShowLocation={() => setShowLocationModal(true)}
+            items={listItems}
+            onUpdateQuantity={handleUpdateQuantity}
           />
         );
       case 'list':
         return (
           <ListView 
             items={listItems} 
-            onUpdateQuantity={(itemId, delta) => {
-              setListItems(prev => {
-                return prev.map(item => {
-                  if (item.id === itemId) {
-                    const newQuantity = item.quantity + delta;
-                    return { ...item, quantity: newQuantity };
-                  }
-                  return item;
-                }).filter(item => item.quantity > 0);
-              });
-            }}
+            savedLists={savedLists}
+            onUpdateQuantity={handleUpdateQuantity}
             onUpdatePrice={(itemId, newPrice) => {
               setListItems(prev => {
                 return prev.map(item => {
@@ -274,6 +312,10 @@ const AppContent = () => {
               });
             }}
             onClear={() => setListItems([])}
+            onSaveNamedList={handleSaveNamedList}
+            onDeleteNamedList={handleDeleteNamedList}
+            onRenameNamedList={handleRenameNamedList}
+            onLoadNamedList={handleLoadNamedList}
           />
         );
       case 'profile':
@@ -286,20 +328,33 @@ const AppContent = () => {
             onSearch={handleSearch} 
             onViewChange={handleViewChange} 
             onShowLocation={() => setShowLocationModal(true)}
+            items={listItems}
+            onUpdateQuantity={handleUpdateQuantity}
           />
         );
     }
+  };
+
+  const handleRemoveFromList = (itemId: string) => {
+    setListItems(prev => prev.filter(item => item.id !== itemId));
+  };
+
+  const handleClearList = () => {
+    setListItems([]);
   };
 
   return (
     <Layout 
       activeView={activeView} 
       onViewChange={handleViewChange} 
-      cartCount={listItems.length}
-      onScan={() => setScanning(true)}
+      cartCount={listItems.reduce((acc, item) => acc + item.quantity, 0)}
+      onScan={() => handleViewChange('scanner')}
       showLocationModal={showLocationModal}
       onShowLocation={() => setShowLocationModal(true)}
       onCloseLocation={() => setShowLocationModal(false)}
+      listItems={listItems}
+      onRemoveItem={handleRemoveFromList}
+      onClearList={handleClearList}
     >
       {renderView()}
       {scanning && (

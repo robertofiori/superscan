@@ -1,11 +1,103 @@
 import { useEffect, useState } from 'react';
-import { ShoppingBag, Sparkles, AlertCircle, Plus } from 'lucide-react';
+import { ShoppingBag, Sparkles, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { fetchDailyOffers, type SupermarketPrice, type ProductData } from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import { getApplicableDiscount } from '../data/bankDiscounts';
+import ProductQuantitySelector from './ProductQuantitySelector';
 
 interface OffersViewProps {
-  onAddToList: (product: ProductData, bestPrice: SupermarketPrice, allPrices: SupermarketPrice[]) => void;
+  onAddToList: (product: ProductData, bestPrice: SupermarketPrice, allPrices: SupermarketPrice[], quantity: number) => void;
+}
+
+function OfferCard({ offer, onAdd, paymentMethods }: { offer: SupermarketPrice, onAdd: (qty: number) => void, paymentMethods: string[] }) {
+  const [quantity, setQuantity] = useState(1);
+  const [added, setAdded] = useState(false);
+  const discountInfo = getApplicableDiscount(offer.supermarket, paymentMethods);
+  const effectivePrice = discountInfo 
+    ? offer.price * (1 - discountInfo.discount)
+    : offer.price;
+
+  return (
+    <div className="bg-white rounded-[32px] p-4 flex flex-col shadow-sm border-2 border-slate-100 relative overflow-hidden group hover:shadow-lg transition-all">
+      {/* Etiqueta Oferta */}
+      <div className="absolute top-0 right-0 bg-yellow-400 text-yellow-900 text-[10px] font-black uppercase tracking-wider px-4 py-1.5 rounded-bl-2xl shadow-sm z-10 transition-transform group-hover:scale-105">
+        OFERTA
+      </div>
+
+      {/* Supermercado Badge */}
+      <div className="absolute top-4 left-4 bg-white/90 backdrop-blur shadow-sm text-[9px] font-black text-primary-green px-3 py-1 rounded-full z-10 border border-green-50/50">
+        {offer.supermarket}
+      </div>
+      
+      {/* Imagen */}
+      <div className="h-32 w-full bg-white flex items-center justify-center mb-4 mt-6 relative">
+        {offer.imageUrl ? (
+          <img src={offer.imageUrl} alt={offer.productName} className="h-full object-contain drop-shadow-sm group-hover:scale-110 transition-transform duration-500" />
+        ) : (
+          <ShoppingBag className="text-slate-100" size={48} />
+        )}
+      </div>
+
+      {/* Info */}
+      <div className="flex flex-col flex-1 px-1">
+        <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">{offer.brand || 'Varias'}</span>
+        <h3 className="font-bold text-slate-800 text-[13px] leading-snug line-clamp-2 mb-3 min-h-[36px]">
+          {offer.productName}
+        </h3>
+        
+        <div className="mt-auto space-y-3">
+          <div>
+            {offer.originalPrice && offer.originalPrice > offer.price && (
+              <span className="text-[11px] text-slate-400 line-through font-bold block leading-none mb-1">
+                ${offer.originalPrice.toLocaleString('es-AR')}
+              </span>
+            )}
+            <div className="flex items-center gap-2">
+              <span className="text-xl font-black text-primary-green tracking-tight">
+                ${offer.price.toLocaleString('es-AR')}
+              </span>
+              {offer.unitType && (
+                <span className="text-[10px] text-slate-400 font-bold bg-slate-50 px-2 py-0.5 rounded-md">
+                  x {offer.unitType}
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Effective Price with Bank Discount */}
+          {discountInfo && (
+            <div className="bg-green-50 p-2.5 rounded-2xl border border-green-100/50">
+              <div className="flex items-center gap-1.5 text-[10px] font-black text-primary-green uppercase mb-0.5">
+                <Sparkles size={10} className="fill-current" /> {discountInfo.name} -{(discountInfo.discount * 100).toFixed(0)}%
+              </div>
+              <span className="text-sm font-black text-slate-900 block">
+                Final: ${effectivePrice.toLocaleString('es-AR', {maximumFractionDigits: 0})}
+              </span>
+            </div>
+          )}
+
+          {/* Quantity Selector & Add Button */}
+          <div className="flex flex-col gap-2 pt-2">
+            <ProductQuantitySelector quantity={quantity} onUpdate={setQuantity} />
+            <button 
+              onClick={() => {
+                onAdd(quantity);
+                setAdded(true);
+                setTimeout(() => setAdded(false), 2000);
+                setQuantity(1);
+              }}
+              className={`w-full flex items-center justify-center gap-2 py-4 rounded-2xl text-[12px] font-black active:scale-[0.97] transition-all shadow-lg uppercase tracking-widest ${
+                added ? 'bg-emerald-500 text-white' : 'bg-primary-green text-white hover:bg-green-600'
+              }`}
+            >
+              {added ? <CheckCircle2 size={16} /> : null}
+              {added ? '¡Agregado!' : 'Agregar'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export default function OffersView({ onAddToList }: OffersViewProps) {
@@ -23,7 +115,12 @@ export default function OffersView({ onAddToList }: OffersViewProps) {
       setLoading(true);
       const data = await fetchDailyOffers(userData.location);
       if (active) {
-        setOffers(data);
+        const isDiaChain = (name: string) => {
+          if (!name) return false;
+          const normalized = name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+          return normalized.includes('dia');
+        };
+        setOffers(data.filter(o => !isDiaChain(o.supermarket)));
         setLoading(false);
       }
     };
@@ -31,7 +128,7 @@ export default function OffersView({ onAddToList }: OffersViewProps) {
     return () => { active = false; };
   }, [userData?.location]);
 
-  const handleAdd = (priceItem: SupermarketPrice) => {
+  const handleAdd = (priceItem: SupermarketPrice, quantity: number) => {
     // Buscar precios del mismo producto en otras tiendas dentro de las ofertas actuales
     const relevantPrices = offers.filter(o => 
       o.brand?.toLowerCase() === priceItem.brand?.toLowerCase() &&
@@ -50,7 +147,7 @@ export default function OffersView({ onAddToList }: OffersViewProps) {
       relevantPrices.push(priceItem);
     }
 
-    onAddToList(prod, priceItem, relevantPrices);
+    onAddToList(prod, priceItem, relevantPrices, quantity);
   };
 
   if (loading) {
@@ -107,83 +204,15 @@ export default function OffersView({ onAddToList }: OffersViewProps) {
           <p className="text-slate-500 text-sm mt-2">Vuelve más tarde para ver nuevos descuentos.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-4">
-          {offers.map((offer, idx) => {
-            const discountInfo = getApplicableDiscount(offer.supermarket, userData?.paymentMethods || []);
-            const effectivePrice = discountInfo 
-              ? offer.price * (1 - discountInfo.discount)
-              : offer.price;
-
-            return (
-              <div 
-                key={`${offer.id}-${idx}`}
-                className="bg-white rounded-[24px] p-4 flex flex-col shadow-lg border border-slate-100 relative overflow-hidden group hover:shadow-xl transition-all"
-              >
-              {/* Etiqueta Oferta */}
-              <div className="absolute top-0 right-0 bg-yellow-400 text-yellow-900 text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-bl-xl shadow-sm z-10">
-                OFERTA
-              </div>
-
-              {/* Supermercado Badge */}
-              <div className="absolute top-3 left-3 bg-slate-100 text-[9px] font-bold text-slate-500 px-2 py-0.5 rounded-full z-10 border border-slate-200">
-                {offer.supermarket}
-              </div>
-              
-              {/* Imagen */}
-              <div className="h-28 w-full bg-white flex items-center justify-center mb-3 mt-4 relative">
-                {offer.imageUrl ? (
-                  <img src={offer.imageUrl} alt={offer.productName} className="h-full object-contain drop-shadow-sm group-hover:scale-110 transition-transform duration-300" />
-                ) : (
-                  <ShoppingBag className="text-slate-200" size={32} />
-                )}
-              </div>
-
-              {/* Info */}
-              <div className="flex flex-col flex-1">
-                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-0.5 truncate">{offer.brand || 'Varias'}</span>
-                <h3 className="font-bold text-slate-800 text-xs leading-tight line-clamp-2 mb-2 min-h-[32px]">
-                  {offer.productName || 'Producto Desconocido'}
-                </h3>
-                
-                <div className="mt-auto">
-                  {offer.originalPrice && offer.originalPrice > offer.price && (
-                    <span className="text-[10px] text-slate-400 line-through font-bold block leading-none mb-0.5">
-                      ${offer.originalPrice.toLocaleString('es-AR')}
-                    </span>
-                  )}
-                  <span className="text-lg font-black text-primary-green block leading-none">
-                    ${offer.price.toLocaleString('es-AR')}
-                  </span>
-                  {offer.pricePerUnit && offer.unitType && (
-                    <span className="text-[9px] text-slate-500 font-bold mt-1 block">
-                      ${offer.pricePerUnit.toLocaleString('es-AR', {maximumFractionDigits: 0})} / {offer.unitType}
-                    </span>
-                  )}
-
-                  {/* Effective Price with Bank Discount */}
-                  {discountInfo && (
-                    <div className="mt-2 pt-2 border-t border-slate-100">
-                      <div className="flex items-center gap-1 text-[9px] font-black text-primary-green uppercase">
-                        {discountInfo.name} -{(discountInfo.discount * 100).toFixed(0)}%
-                      </div>
-                      <span className="text-xs font-black text-slate-900 block">
-                        Final: ${effectivePrice.toLocaleString('es-AR', {maximumFractionDigits: 0})}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Add button */}
-              <button 
-                onClick={() => handleAdd(offer)}
-                className="mt-3 w-full bg-slate-900 text-white flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-[11px] font-bold active:scale-95 transition-all shadow-md"
-              >
-                <Plus size={14} /> Agregar
-              </button>
-              </div>
-            );
-          })}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {offers.map((offer, idx) => (
+            <OfferCard 
+              key={`${offer.id}-${idx}`}
+              offer={offer}
+              onAdd={(qty) => handleAdd(offer, qty)}
+              paymentMethods={userData?.paymentMethods || []}
+            />
+          ))}
         </div>
       )}
     </div>

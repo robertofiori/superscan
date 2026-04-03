@@ -84,7 +84,16 @@ export async function getSupermarketPrices(query: string, location?: LocationDat
         };
       });
 
-    // Filtro de seguridad frontend para Bahía Blanca
+    // Robust check for DIA chain using Unicode normalization
+    const isDiaChain = (name: string) => {
+      if (!name) return false;
+      const normalized = name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+      return normalized.includes('dia');
+    };
+
+    // Filtro de seguridad frontend para Bahía Blanca y exclusión de DIA
+    validPrices = validPrices.filter(p => !isDiaChain(p.supermarket));
+
     const city = location?.city?.toLowerCase() || '';
     if (city.includes('bahia blanca')) {
       const allowed = ['vea', 'carrefour', 'chango mas', 'cooperativa obrera', 'la coope'];

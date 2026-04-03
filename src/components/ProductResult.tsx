@@ -1,16 +1,149 @@
 import { useState } from 'react';
-import { ShoppingBag, AlertCircle, ExternalLink, Search, ArrowDownUp, Tag } from 'lucide-react';
+import { ShoppingBag, AlertCircle, ExternalLink, Search, ArrowDownUp, Tag, Plus } from 'lucide-react';
 import { type ProductData, type SupermarketPrice } from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import { getApplicableDiscount } from '../data/bankDiscounts';
+import ProductQuantitySelector from './ProductQuantitySelector';
 
 interface ProductResultProps {
   product: ProductData;
   prices: SupermarketPrice[];
-  onAddToList: (product: ProductData, bestPrice: SupermarketPrice) => void;
+  onAddToList: (product: ProductData, bestPrice: SupermarketPrice, quantity: number) => void;
   onScanAnother: () => void;
 }
 
+function PriceRow({ p, product, isBest, bestValueItemId, userData, onAddToList, queryName }: { 
+  p: SupermarketPrice, 
+  product: ProductData, 
+  isBest: boolean, 
+  bestValueItemId?: string, 
+  userData: any, 
+  onAddToList: (prod: ProductData, price: SupermarketPrice, qty: number) => void,
+  queryName: string
+}) {
+  const [quantity, setQuantity] = useState(1);
+  const discountInfo = getApplicableDiscount(p.supermarket, userData?.paymentMethods || []);
+  const effectivePrice = discountInfo ? p.price * (1 - discountInfo.discount) : p.price;
+
+  return (
+    <div 
+      className={`flex items-start justify-between p-4 rounded-2xl border ${
+        isBest ? 'border-primary bg-primary/5 shadow-sm shadow-primary/10' : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900'
+      } ${!p.inStock ? 'opacity-60 grayscale' : ''}`}
+    >
+      <div className="flex flex-col gap-2 flex-1 pr-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-[10px] font-bold uppercase tracking-wider rounded-md text-slate-600 dark:text-slate-300">
+            {p.supermarket}
+          </span>
+          {p.id === bestValueItemId && (
+            <span className="text-[10px] text-emerald-600 bg-emerald-50 dark:bg-emerald-500/10 px-2 py-0.5 rounded-md font-bold uppercase tracking-wider border border-emerald-200 dark:border-emerald-500/20 flex items-center gap-1">
+               🌟 Rinde Más
+            </span>
+          )}
+          {isBest && p.id !== bestValueItemId && (
+            <span className="text-[10px] text-primary bg-primary/10 px-2 py-0.5 rounded-md font-bold uppercase tracking-wider border border-primary/20">💰 Más Barato</span>
+          )}
+          {!p.inStock && (
+             <span className="text-[10px] text-red-500 font-bold uppercase tracking-wider flex items-center gap-1">
+               <AlertCircle size={10} /> Sin stock
+             </span>
+          )}
+        </div>
+        
+        <div className="flex items-center gap-3">
+          {p.imageUrl ? (
+            <div className="w-14 h-14 shrink-0 bg-white rounded-xl border border-slate-100 overflow-hidden p-1 shadow-sm">
+              <img src={p.imageUrl} alt={p.productName} className="w-full h-full object-contain mix-blend-multiply dark:mix-blend-normal" />
+            </div>
+          ) : (
+            <div className="w-14 h-14 shrink-0 bg-slate-50 border border-slate-100 rounded-xl flex items-center justify-center">
+              <ShoppingBag className="text-slate-300" size={24} />
+            </div>
+          )}
+          <div className="flex flex-col">
+            <span className="font-bold text-slate-800 dark:text-slate-100 text-[13px] leading-tight line-clamp-2">{p.productName || queryName}</span>
+            <span className="text-[11px] text-slate-500 font-medium mt-0.5 uppercase tracking-wide">{p.brand || 'Varias Marcas'}</span>
+          </div>
+        </div>
+      </div>
+      
+      <div className="flex flex-col items-end gap-1.5 shrink-0 min-w-[110px]">
+        {p.price > 0 ? (
+          <>
+            {p.isOffer && p.originalPrice ? (
+              <div className="flex flex-col items-end leading-none">
+                <span className="text-[10px] text-slate-400 line-through font-bold">${p.originalPrice.toLocaleString('es-AR')}</span>
+                <span className={`text-xl font-black ${isBest ? 'text-primary' : 'text-slate-800 dark:text-slate-100'}`}>
+                  ${p.price.toLocaleString('es-AR')}
+                </span>
+                <span className="bg-yellow-400 text-yellow-900 text-[9px] font-black px-1.5 py-0.5 rounded uppercase mt-0.5 shadow-sm">Oferta</span>
+              </div>
+            ) : (
+              <span className={`text-xl font-black mt-1 ${isBest ? 'text-primary' : 'text-slate-800 dark:text-slate-100'}`}>
+                ${p.price.toLocaleString('es-AR')}
+              </span>
+            )}
+            
+            {p.pricePerUnit && p.unitType && (
+              <div className="flex flex-col items-end mt-0.5">
+                <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-black">
+                  ${p.pricePerUnit.toLocaleString('es-AR', {maximumFractionDigits: 0})} / {p.unitType}
+                </span>
+              </div>
+            )}
+
+            {/* Info de Descuento Bancario */}
+            {discountInfo && (
+              <div className="mt-1 flex flex-col items-end">
+                <div className="flex items-center gap-1 bg-primary/10 border border-primary/20 px-1.5 py-0.5 rounded text-[9px] font-black text-primary">
+                  {discountInfo.name} -{(discountInfo.discount * 100).toFixed(0)}%
+                </div>
+                <span className="text-xs font-black text-emerald-600 dark:text-emerald-400 mt-0.5">
+                  Pagas: ${effectivePrice.toLocaleString('es-AR', {maximumFractionDigits: 0})}
+                </span>
+              </div>
+            )}
+            
+            {p.inStock && (
+              <div className="flex flex-col gap-2 mt-2 w-full">
+                <ProductQuantitySelector quantity={quantity} onUpdate={setQuantity} />
+                <button 
+                  onClick={() => {
+                    onAddToList(product, p, quantity);
+                    setQuantity(1);
+                  }} 
+                  className={`text-[11px] font-black py-2.5 px-3 rounded-xl transition-all uppercase tracking-wider w-full flex items-center justify-center gap-1.5 ${
+                    isBest 
+                    ? 'bg-primary hover:bg-violet-600 text-white shadow-md shadow-primary/20' 
+                    : 'bg-slate-900 dark:bg-slate-100 hover:bg-black dark:hover:bg-white text-white dark:text-slate-900 shadow-sm'
+                  }`}
+                >
+                  <Plus size={14} /> Agregar
+                </button>
+              </div>
+            )}
+            
+            {p.url && (
+              <a 
+                href={p.url} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="flex items-center gap-1 text-[10px] font-bold text-slate-400 hover:text-blue-500 transition-colors mt-1"
+              >
+                Ver web <ExternalLink size={10} /> 
+              </a>
+            )}
+          </>
+        ) : (
+          <span className="text-xs font-bold text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-md mt-2">
+            Agotado
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export default function ProductResult({ product, prices, onAddToList, onScanAnother }: ProductResultProps) {
   const { userData } = useAuth();
@@ -26,11 +159,9 @@ export default function ProductResult({ product, prices, onAddToList, onScanAnot
     
     let comparison = 0;
     if (sortBy === 'unitPrice') {
-      // If both have unit prices, compare them
       if (a.pricePerUnit != null && b.pricePerUnit != null && a.unitType === b.unitType) {
         comparison = a.pricePerUnit - b.pricePerUnit;
       } else {
-        // Fallback to absolute price if units don't match or are missing
         comparison = a.price - b.price;
       }
     } else {
@@ -40,7 +171,6 @@ export default function ProductResult({ product, prices, onAddToList, onScanAnot
     return sortOrder === 'asc' ? comparison : -comparison;
   });
   
-  // The truly "Best Option" is the one with lowest unit price if available
   const bestValueItem = [...prices]
     .filter(p => p.inStock && p.price > 0 && p.pricePerUnit != null)
     .sort((a, b) => (a.pricePerUnit || 0) - (b.pricePerUnit || 0))[0];
@@ -117,124 +247,18 @@ export default function ProductResult({ product, prices, onAddToList, onScanAnot
       <div className="space-y-3 mb-6 lg:max-h-[50vh] overflow-y-auto pr-1">
         {sortedPrices.length > 0 ? (
           sortedPrices.map((p) => {
-            const discountInfo = getApplicableDiscount(p.supermarket, userData?.paymentMethods || []);
-            const effectivePrice = discountInfo 
-              ? p.price * (1 - discountInfo.discount)
-              : p.price;
-            
             const isBest = p.id === minPrice?.id && p.inStock && p.price === minPrice.price;
             return (
-              <div 
-                key={`${p.id}-${p.url}`} 
-                className={`flex items-start justify-between p-4 rounded-2xl border ${
-                  isBest ? 'border-primary bg-primary/5 shadow-sm shadow-primary/10' : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900'
-                } ${!p.inStock ? 'opacity-60 grayscale' : ''}`}
-              >
-                <div className="flex flex-col gap-2 flex-1 pr-3">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-[10px] font-bold uppercase tracking-wider rounded-md text-slate-600 dark:text-slate-300">
-                      {p.supermarket}
-                    </span>
-                    {p.id === bestValueItem?.id && (
-                      <span className="text-[10px] text-emerald-600 bg-emerald-50 dark:bg-emerald-500/10 px-2 py-0.5 rounded-md font-bold uppercase tracking-wider border border-emerald-200 dark:border-emerald-500/20 flex items-center gap-1">
-                         🌟 Rinde Más
-                      </span>
-                    )}
-                    {isBest && p.id !== bestValueItem?.id && (
-                      <span className="text-[10px] text-primary bg-primary/10 px-2 py-0.5 rounded-md font-bold uppercase tracking-wider border border-primary/20">💰 Más Barato</span>
-                    )}
-                    {!p.inStock && (
-                       <span className="text-[10px] text-red-500 font-bold uppercase tracking-wider flex items-center gap-1">
-                         <AlertCircle size={10} /> Sin stock
-                       </span>
-                    )}
-                  </div>
-                  
-                  <div className="flex items-center gap-3">
-                    {p.imageUrl ? (
-                      <div className="w-14 h-14 shrink-0 bg-white rounded-xl border border-slate-100 overflow-hidden p-1 shadow-sm">
-                        <img src={p.imageUrl} alt={p.productName} className="w-full h-full object-contain mix-blend-multiply dark:mix-blend-normal" />
-                      </div>
-                    ) : (
-                      <div className="w-14 h-14 shrink-0 bg-slate-50 border border-slate-100 rounded-xl flex items-center justify-center">
-                        <ShoppingBag className="text-slate-300" size={24} />
-                      </div>
-                    )}
-                    <div className="flex flex-col">
-                      <span className="font-bold text-slate-800 dark:text-slate-100 text-[13px] leading-tight line-clamp-2">{p.productName || queryName}</span>
-                      <span className="text-[11px] text-slate-500 font-medium mt-0.5 uppercase tracking-wide">{p.brand || 'Varias Marcas'}</span>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="flex flex-col items-end gap-1.5 shrink-0 min-w-[80px]">
-                  {p.price > 0 ? (
-                    <>
-                      {p.isOffer && p.originalPrice ? (
-                        <div className="flex flex-col items-end leading-none">
-                          <span className="text-[10px] text-slate-400 line-through font-bold">${p.originalPrice.toLocaleString('es-AR')}</span>
-                          <span className={`text-xl font-black ${isBest ? 'text-primary' : 'text-slate-800 dark:text-slate-100'}`}>
-                            ${p.price.toLocaleString('es-AR')}
-                          </span>
-                          <span className="bg-yellow-400 text-yellow-900 text-[9px] font-black px-1.5 py-0.5 rounded uppercase mt-0.5 shadow-sm">Oferta</span>
-                        </div>
-                      ) : (
-                        <span className={`text-xl font-black mt-1 ${isBest ? 'text-primary' : 'text-slate-800 dark:text-slate-100'}`}>
-                          ${p.price.toLocaleString('es-AR')}
-                        </span>
-                      )}
-                      
-                      {p.pricePerUnit && p.unitType && (
-                        <div className="flex flex-col items-end mt-0.5">
-                          <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-black">
-                            ${p.pricePerUnit.toLocaleString('es-AR', {maximumFractionDigits: 0})} / {p.unitType}
-                          </span>
-                        </div>
-                      )}
-
-                      {/* Info de Descuento Bancario */}
-                      {discountInfo && (
-                        <div className="mt-1 flex flex-col items-end">
-                          <div className="flex items-center gap-1 bg-primary/10 border border-primary/20 px-1.5 py-0.5 rounded text-[9px] font-black text-primary">
-                            {discountInfo.name} -{(discountInfo.discount * 100).toFixed(0)}%
-                          </div>
-                          <span className="text-xs font-black text-emerald-600 dark:text-emerald-400 mt-0.5">
-                            Pagas: ${effectivePrice.toLocaleString('es-AR', {maximumFractionDigits: 0})}
-                          </span>
-                        </div>
-                      )}
-                      
-                      {p.inStock && (
-                        <button 
-                          onClick={() => onAddToList(product, p)} 
-                          className={`mt-1 text-[11px] font-bold py-1.5 px-3 rounded-lg transition-all ${
-                            isBest 
-                            ? 'bg-primary hover:bg-violet-600 text-white shadow-md shadow-primary/20' 
-                            : 'bg-slate-900 dark:bg-slate-100 hover:bg-black dark:hover:bg-white text-white dark:text-slate-900 shadow-sm'
-                          }`}
-                        >
-                          Agregar
-                        </button>
-                      )}
-                      
-                      {p.url && (
-                        <a 
-                          href={p.url} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-1 text-[10px] font-bold text-slate-400 hover:text-blue-500 transition-colors mt-1"
-                        >
-                          Ver web <ExternalLink size={10} /> 
-                        </a>
-                      )}
-                    </>
-                  ) : (
-                    <span className="text-xs font-bold text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-md mt-2">
-                      Agotado
-                    </span>
-                  )}
-                </div>
-              </div>
+              <PriceRow 
+                key={`${p.id}-${p.url}`}
+                p={p}
+                product={product}
+                isBest={isBest}
+                bestValueItemId={bestValueItem?.id}
+                userData={userData}
+                onAddToList={onAddToList}
+                queryName={queryName}
+              />
             );
           })
         ) : (
@@ -250,7 +274,6 @@ export default function ProductResult({ product, prices, onAddToList, onScanAnot
         )}
       </div>
 
-      {/* Actions */}
       <div className="flex gap-3">
         <button 
           onClick={onScanAnother}

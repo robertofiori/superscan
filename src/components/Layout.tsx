@@ -1,6 +1,9 @@
-import { Search, Tag, ListOrdered, User, MapPin, Barcode } from 'lucide-react';
+import React from 'react';
+import { Search, Tag, User, Scan, ListChecks, MapPin, ListOrdered, Barcode } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import LocationModal from './LocationModal';
+import { type ShoppingListItem } from '../api';
+import { SidebarList } from './SidebarList';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -11,6 +14,9 @@ interface LayoutProps {
   showLocationModal: boolean;
   onShowLocation: () => void;
   onCloseLocation: () => void;
+  listItems?: ShoppingListItem[];
+  onRemoveItem?: (id: string) => void;
+  onClearList?: () => void;
 }
 
 const Layout: React.FC<LayoutProps> = ({ 
@@ -21,135 +27,187 @@ const Layout: React.FC<LayoutProps> = ({
   onScan, 
   showLocationModal, 
   onShowLocation, 
-  onCloseLocation 
+  onCloseLocation,
+  listItems = [],
+  onRemoveItem = () => {},
+  onClearList = () => {}
 }) => {
   const { user, userData } = useAuth();
   const avatarUrl = userData?.avatarUrl || user?.photoURL;
+  
   return (
-    <div className="min-h-screen pb-24 bg-background-soft text-text-dark font-sans">
-      {/* Header - Visible solo en escritorio */}
-      <header className="fixed top-0 left-0 right-0 h-16 bg-surface shadow-sm z-50 px-6 hidden sm:flex justify-between items-center border-b border-slate-200">
-        
-        {/* Lado Izquierdo (Buscar en Escritorio / Ubicación) */}
-        <div className="flex-1 flex justify-start items-center gap-4 w-1/3">
-          <div className="w-full max-w-xs relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-            <input
-              type="text"
-              placeholder="Buscar productos..."
-              className="w-full bg-slate-100 border-none rounded-full py-2 pl-10 pr-4 text-sm focus:ring-2 focus:ring-primary-green outline-none transition-all"
+    <div className="min-h-screen flex flex-col bg-background-soft text-text-dark font-sans">
+      {/* Header - Desktop Optimized */}
+      <header className="h-20 bg-white/80 backdrop-blur-md shadow-sm z-50 px-8 hidden lg:flex justify-between items-center border-b border-slate-100 sticky top-0">
+        <div className="flex items-center gap-6">
+          <div className="cursor-pointer flex items-center gap-2" onClick={() => onViewChange('home')}>
+            <img
+              src={`${import.meta.env.BASE_URL}header-logo.svg`}
+              alt="ElMango"
+              className="h-10 object-contain scale-[2.2] translate-y-[-2px] mr-6"
             />
           </div>
           
-          {/* Ubicación (Escritorio) */}
+          <nav className="flex items-center gap-1">
+            <button
+              onClick={() => onViewChange('list')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-black transition-all ${
+                activeView === 'list'
+                  ? 'bg-primary-green/10 text-primary-green'
+                  : 'text-slate-500 hover:bg-slate-50'
+              }`}
+            >
+              <ListChecks size={18} />
+              MI LISTA
+            </button>
+            <button
+              onClick={() => onViewChange('offers')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-black transition-all ${
+                activeView === 'offers'
+                  ? 'bg-fuchsia-100 text-fuchsia-600'
+                  : 'text-slate-500 hover:bg-slate-50'
+              }`}
+            >
+              <Tag size={18} />
+              OFERTAS
+            </button>
+          </nav>
+        </div>
+
+        {/* Central Search Area */}
+        <div className="flex-1 max-w-lg mx-8">
+          <div className="relative group">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-primary-green transition-colors" size={18} />
+            <input
+              type="text"
+              placeholder="¿Qué buscamos hoy?"
+              className="w-full bg-slate-50 border-2 border-transparent rounded-[20px] py-2.5 pl-12 pr-4 text-[15px] font-medium focus:bg-white focus:border-primary-green/20 outline-none transition-all shadow-inner"
+              onClick={() => activeView !== 'home' && onViewChange('home')}
+            />
+          </div>
+        </div>
+
+        {/* User & Actions */}
+        <div className="flex items-center gap-4">
           <button 
             onClick={onShowLocation}
-            className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 hover:bg-slate-100 rounded-full transition-all border border-slate-100 group min-h-[40px]"
+            className="flex items-center gap-2 px-4 py-2 bg-slate-50 hover:bg-slate-100 rounded-xl transition-all border border-slate-100 group"
+            title="Cambiar Ubicación"
           >
-            <div className="w-7 h-7 bg-white rounded-full flex items-center justify-center text-primary-green shadow-sm group-hover:scale-110 transition-transform">
-              <MapPin size={14} />
-            </div>
-            <div className="flex flex-col items-start leading-none pr-1">
-              <span className="text-[10px] text-slate-400 font-black uppercase tracking-tighter">Tu Ciudad</span>
-              <span className="text-xs font-black text-slate-700 truncate max-w-[100px]">
-                {userData?.location?.city || 'Seleccionar'}
-              </span>
-            </div>
+            <MapPin size={16} className="text-primary-green group-hover:scale-110 transition-transform" />
+            <span className="text-xs font-black text-slate-600 uppercase tracking-tight">
+              {userData?.location?.city || 'Seleccionar'}
+            </span>
           </button>
-        </div>
 
-        {/* Centro (Logo Escritorio) */}
-        <div className="flex-shrink-0 cursor-pointer absolute left-1/2 -translate-x-1/2 flex justify-center items-center pt-1" onClick={() => onViewChange('home')}>
-          <img
-            src={`${import.meta.env.BASE_URL}header-logo.svg`}
-            alt="ElMango"
-            className="h-8 object-contain drop-shadow-sm scale-[2.2]"
-            onError={(e) => {
-              e.currentTarget.style.display = 'none';
-              e.currentTarget.nextElementSibling?.classList.remove('hidden');
-            }}
-          />
-          <h1 className="text-2xl font-black text-slate-800 tracking-tighter hidden">
-            El<span className="text-primary-green">Mango</span>
-          </h1>
-        </div>
-
-        {/* Lado Derecho (Perfil Escritorio) */}
-        <div className="flex-1 flex justify-end items-center gap-6 w-1/3">
-           <button
+          <button
             onClick={() => onViewChange('profile')}
-            className={`flex items-center gap-2 p-1 rounded-full transition-all ${activeView === 'profile' ? 'bg-green-50 text-primary-green ring-1 ring-primary-green/20' : 'text-slate-500 hover:bg-slate-50'}`}
+            className={`flex items-center gap-2 p-1 pl-1 pr-4 rounded-xl transition-all border border-transparent ${
+              activeView === 'profile' 
+                ? 'bg-blue-50 text-blue-600 border-blue-100 shadow-sm' 
+                : 'text-slate-500 hover:bg-slate-50 hover:border-slate-100'
+            }`}
           >
-             {avatarUrl ? (
-                <img src={avatarUrl} alt="Perfil" className="w-8 h-8 rounded-full object-cover shadow-sm" />
-              ) : (
-                <div className="w-8 h-8 bg-slate-100 rounded-full flex items-center justify-center">
-                  <User size={18} />
-                </div>
-              )}
-              <span className="text-xs font-bold pr-2 hidden lg:block">{user?.displayName || 'Mi Cuenta'}</span>
+            {avatarUrl ? (
+              <img src={avatarUrl} alt="Perfil" className="w-9 h-9 rounded-full object-cover shadow-sm ring-2 ring-white" />
+            ) : (
+              <div className="w-9 h-9 bg-slate-100 rounded-full flex items-center justify-center">
+                <User size={20} />
+              </div>
+            )}
+            <span className="text-xs font-black tracking-tight uppercase">{user?.displayName?.split(' ')[0] || 'Mi Perfil'}</span>
+          </button>
+
+          <button
+            onClick={onScan}
+            className="flex items-center gap-3 px-5 py-2.5 bg-slate-900 text-white rounded-xl font-black text-sm hover:bg-black transition-all shadow-lg active:scale-95 group"
+          >
+            <Scan size={18} className="text-primary-green group-hover:rotate-12 transition-transform" />
+            ESCANEAR
           </button>
         </div>
       </header>
 
-      {/* Contenido Principal */}
-      <main className="pt-4 sm:pt-20 px-4 max-w-screen-xl mx-auto">
-        {/* Ubicación Mobile se movió a HomeView */}
-        {children}
+      {/* Main Content Area */}
+      <main className="flex-1 flex overflow-hidden bg-white">
+        <div className="flex-1 overflow-y-auto custom-scrollbar">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 mb-24 lg:mb-0">
+            {children}
+          </div>
+        </div>
+
+        {/* Desktop Sidebar - "Mi Lista" Summary */}
+        <aside className="hidden lg:block w-[380px] flex-shrink-0 sticky top-20 h-[calc(100vh-80px)] border-l border-slate-100 overflow-hidden bg-white">
+          <SidebarList 
+            items={listItems}
+            onRemoveItem={onRemoveItem}
+            onClearList={onClearList}
+            onViewFullList={() => onViewChange('list')}
+          />
+        </aside>
       </main>
 
       {showLocationModal && <LocationModal onClose={onCloseLocation} />}
 
-      {/* Modern Bottom Navigation Bar */}
-      <nav className="fixed bottom-0 left-0 right-0 px-4 pb-6 pt-2 bg-gradient-to-t from-white via-white to-transparent pointer-events-none z-50">
-        <div className="max-w-md mx-auto h-18 bg-slate-900/90 backdrop-blur-xl rounded-[32px] flex justify-around items-center px-4 shadow-2xl border border-white/10 pointer-events-auto">
+      {/* Bottom Navigation (Mobile Only) - Professional Refresh */}
+      <nav className="lg:hidden fixed bottom-6 left-1/2 -translate-x-1/2 w-[92%] max-w-[420px] h-18 bg-white/95 backdrop-blur-xl border border-slate-100 shadow-2xl flex items-center justify-around px-2 z-50 rounded-[32px]">
           <NavItem
-            icon={<Search size={22} />}
-            isActive={activeView === 'home' || activeView === 'results'}
-            onClick={() => onViewChange('home')}
+            icon={
+              <div className="relative">
+                <ListOrdered size={24} />
+                {cartCount > 0 && (
+                  <span 
+                    key={cartCount}
+                    className="absolute -top-2 -right-2 bg-primary-green text-white text-[9px] font-black h-4 w-4 rounded-full flex items-center justify-center border border-white shadow-sm animate-in zoom-in duration-300"
+                  >
+                    {cartCount}
+                  </span>
+                )}
+              </div>
+            }
+            label="Lista"
+            isActive={activeView === 'list'}
+            onClick={() => onViewChange('list')}
           />
           <NavItem
-            icon={<Tag size={22} />}
+            icon={<Tag size={24} />}
+            label="Ofertas"
             isActive={activeView === 'offers'}
             onClick={() => onViewChange('offers')}
           />
           
-          {/* Central Highlighted Button: MI LISTA */}
-          <div className="relative -mt-12 flex flex-col items-center">
+          {/* Central Highlighted Search Button */}
+          <div className="relative -mt-10 flex flex-col items-center">
             <button
-              onClick={() => onViewChange('list')}
-              className={`w-16 h-16 rounded-full flex items-center justify-center shadow-xl transition-all active:scale-90 border-[4px] border-surface
-                ${activeView === 'list' 
-                  ? 'bg-primary-green text-white rotate-12 scale-110' 
-                  : 'bg-white text-primary-green hover:bg-primary-green hover:text-white'}`}
+              onClick={() => onViewChange('home')}
+              className={`w-16 h-16 rounded-full flex items-center justify-center shadow-xl transition-all duration-500 active:scale-90 border-[4px] border-white
+                ${activeView === 'home' || activeView === 'results'
+                  ? 'bg-slate-900 text-white scale-110 shadow-slate-200' 
+                  : 'bg-primary-green text-white hover:scale-105'}`}
             >
-              <ListOrdered size={28} />
-              {cartCount > 0 && (
-                <span className="absolute -top-1 -right-1 bg-primary-orange text-white text-[10px] font-black h-6 w-6 rounded-full flex items-center justify-center border-2 border-white shadow-md animate-bounce">
-                  {cartCount}
-                </span>
-              )}
+              <Search size={28} className={activeView === 'home' ? 'animate-pulse' : ''} />
             </button>
-            <span className={`text-[9px] font-black uppercase tracking-widest mt-2 transition-opacity ${activeView === 'list' ? 'text-primary-green opacity-100' : 'text-slate-400 opacity-80'}`}>Mi Lista</span>
+            <span className={`text-[9px] font-black uppercase tracking-[0.1em] mt-2 transition-all ${activeView === 'home' ? 'text-slate-900 opacity-100' : 'text-slate-400 opacity-80'}`}>BUSCAR</span>
           </div>
 
           <NavItem
             icon={avatarUrl ? (
-              <img src={avatarUrl} alt="Perfil" className={`w-6 h-6 rounded-full object-cover ${activeView === 'profile' ? 'ring-2 ring-primary-green' : 'opacity-70'}`} />
+              <img src={avatarUrl} alt="Perfil" className={`w-6 h-6 rounded-full object-cover shadow-sm ${activeView === 'profile' ? 'ring-2 ring-primary-green' : 'opacity-70'}`} />
             ) : (
-              <User size={22} />
+              <User size={24} />
             )}
+            label="Perfil"
             isActive={activeView === 'profile'}
             onClick={() => onViewChange('profile')}
           />
+
           <NavItem
-            icon={<Barcode size={22} />}
+            icon={<Barcode size={24} />}
+            label="Escanear"
             isActive={false}
             onClick={onScan}
           />
-        </div>
       </nav>
-
     </div>
   );
 };
@@ -164,11 +222,11 @@ interface NavItemProps {
 const NavItem: React.FC<NavItemProps> = ({ icon, label, isActive, onClick }) => (
   <button
     onClick={onClick}
-    className={`flex flex-col items-center justify-center w-12 h-12 gap-1 transition-all duration-300 ${isActive ? 'text-primary-green scale-110' : 'text-slate-400 hover:text-slate-200'
+    className={`flex flex-col items-center justify-center w-14 h-14 gap-1 transition-all duration-300 ${isActive ? 'text-primary-green' : 'text-slate-400 hover:text-slate-600'
       }`}
   >
-    {icon}
-    {label && <span className="text-[10px] uppercase tracking-wider">{label}</span>}
+    <div className={isActive ? 'scale-110' : ''}>{icon}</div>
+    {label && <span className={`text-[9px] uppercase font-black tracking-widest ${isActive ? 'opacity-100' : 'opacity-80'}`}>{label}</span>}
   </button>
 );
 

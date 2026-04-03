@@ -1,11 +1,12 @@
-import React, { useState, useMemo } from 'react';
-import { ShoppingBag, AlertCircle, Plus, Zap, ExternalLink, ArrowUpDown } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { ShoppingBag, AlertCircle, Zap, ExternalLink, ArrowUpDown, CheckCircle2 } from 'lucide-react';
 import { type ProductData, type SupermarketPrice } from '../api';
+import ProductQuantitySelector from './ProductQuantitySelector';
 
 interface ResultsViewProps {
   product: ProductData;
   prices: SupermarketPrice[];
-  onAddToList: (product: ProductData, bestPrice: SupermarketPrice, allPrices: SupermarketPrice[]) => void;
+  onAddToList: (product: ProductData, bestPrice: SupermarketPrice, allPrices: SupermarketPrice[], quantity: number) => void;
   onBack: () => void;
 }
 
@@ -27,6 +28,128 @@ const parseSize = (name: string): number => {
   return value;
 };
 
+const ProductCard: React.FC<{
+  productItem: SupermarketPrice;
+  allProductPrices: SupermarketPrice[];
+  originalProduct: ProductData;
+  isBestPrice: boolean;
+  onAddToList: (product: ProductData, bestPrice: SupermarketPrice, allPrices: SupermarketPrice[], quantity: number) => void;
+  queryName: string;
+}> = ({ productItem, allProductPrices, originalProduct, isBestPrice, onAddToList, queryName }) => {
+  const [quantity, setQuantity] = useState(1);
+  const [added, setAdded] = useState(false);
+  const p = productItem;
+
+  return (
+    <div 
+      className={`group bg-white rounded-3xl p-5 shadow-sm border-2 transition-all flex flex-col relative overflow-hidden active:scale-[0.98] ${
+        !p.inStock ? 'opacity-60 grayscale border-transparent' : 
+        p.isOffer ? 'border-primary-orange/20 bg-orange-50/5' : 
+        isBestPrice ? 'border-primary-green/30 shadow-green-100 shadow-xl' : 'border-slate-100'
+      }`}
+    >
+      {/* Image Section - Large & Centered */}
+      <div className="w-full h-48 mb-4 bg-white rounded-2xl overflow-hidden relative group-hover:scale-105 transition-transform duration-500">
+        {p.imageUrl ? (
+          <img src={p.imageUrl} alt={p.productName} className="w-full h-full object-contain p-4" />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center bg-slate-50">
+              <ShoppingBag className="text-slate-200" size={64} />
+          </div>
+        )}
+
+        {/* Badges Overlay */}
+        <div className="absolute top-2 left-2 flex flex-col gap-1">
+          <span className="text-[10px] font-black uppercase tracking-wider text-primary-green bg-white/95 backdrop-blur shadow-sm px-3 py-1 rounded-full border border-green-100/50">
+            {p.supermarket}
+          </span>
+          {p.isOffer && (
+            <span className="text-[10px] font-black uppercase tracking-widest text-white bg-primary-orange px-3 py-1 rounded-full shadow-md flex items-center gap-1 animate-pulse">
+              <Zap size={10} className="fill-current" /> OFERTA
+            </span>
+          )}
+        </div>
+
+        {isBestPrice && (
+          <div className="absolute top-0 right-4 bg-primary-green text-white text-[10px] font-black px-4 py-1.5 rounded-b-xl shadow-lg z-10">
+            MEJOR PRECIO
+          </div>
+        )}
+      </div>
+
+      {/* Info Section */}
+      <div className="flex flex-col flex-1 min-w-0">
+        <h3 className="font-bold text-slate-800 text-base line-clamp-2 leading-tight mb-4 min-h-[3rem]">
+          {p.productName || queryName}
+        </h3>
+        
+        <div className="flex flex-col gap-3 mt-auto">
+          {/* Price Info */}
+          <div className="flex items-center justify-between">
+              <div className="flex flex-col">
+                  <div className="flex items-baseline gap-2">
+                      <span className="text-2xl font-black text-slate-900">${p.price.toLocaleString('es-AR')}</span>
+                      {p.originalPrice && p.originalPrice > p.price && (
+                          <span className="text-sm text-slate-400 line-through font-medium">${p.originalPrice.toLocaleString('es-AR')}</span>
+                      )}
+                  </div>
+                  {p.isOffer && p.originalPrice && p.originalPrice > p.price && (
+                     <span className="text-[11px] font-bold text-primary-orange flex items-center gap-1">
+                       Ahorrás ${(p.originalPrice - p.price).toLocaleString('es-AR')}
+                     </span>
+                  )}
+              </div>
+          </div>
+
+          <div className="flex flex-col gap-2">
+              <ProductQuantitySelector quantity={quantity} onUpdate={setQuantity} />
+              
+              <button 
+                  onClick={(e) => {
+                      e.stopPropagation();
+                      if (p.inStock) {
+                        const relevantPrices = allProductPrices.filter(other => {
+                          const sameBrand = other.brand?.toLowerCase() === p.brand?.toLowerCase();
+                          const similarName = other.productName?.toLowerCase().includes(p.productName?.split(' ')[0].toLowerCase() || '');
+                          return sameBrand || similarName;
+                        });
+                        onAddToList(originalProduct, p, relevantPrices, quantity);
+                        setAdded(true);
+                        setTimeout(() => setAdded(false), 2000);
+                        setQuantity(1); // Reset quantity after adding
+                      }
+                  }}
+                  disabled={!p.inStock}
+                  className={`w-full py-4 rounded-2xl flex items-center justify-center gap-2 transition-all shadow-lg font-black text-sm uppercase tracking-widest ${
+                      !p.inStock 
+                      ? 'bg-slate-100 text-slate-300 cursor-not-allowed shadow-none'
+                      : added 
+                      ? 'bg-emerald-500 text-white shadow-emerald-100' 
+                      : 'bg-primary-green hover:bg-green-600 text-white active:scale-[0.98] shadow-green-100'
+                  }`}
+              >
+                  {added ? <CheckCircle2 size={16} /> : null}
+                  {p.inStock ? (added ? '¡Agregado!' : 'Agregar') : 'Sin Stock'}
+              </button>
+          </div>
+
+          {/* External Link */}
+          {p.url && (
+              <a 
+                  href={p.url} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="bg-slate-50 py-2 rounded-xl text-[10px] font-black text-slate-400 flex items-center justify-center gap-2 hover:bg-slate-100 transition-colors uppercase tracking-widest border border-slate-100"
+              >
+                  Ver en tienda <ExternalLink size={10} />
+              </a>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const ResultsView: React.FC<ResultsViewProps> = ({ product, prices, onAddToList, onBack }) => {
   const [sortBy, setSortBy] = useState<SortOption>('price');
   const [showOnlyOffers, setShowOnlyOffers] = useState(false);
@@ -34,7 +157,14 @@ const ResultsView: React.FC<ResultsViewProps> = ({ product, prices, onAddToList,
   const queryName = product.product_name?.replace('Búsqueda: ', '') || 'Producto';
 
   const processedPrices = useMemo(() => {
-    let result = [...prices];
+    // Robust check for DIA chain matches api.ts
+    const isDiaChain = (name: string) => {
+      if (!name) return false;
+      const normalized = name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+      return normalized.includes('dia');
+    };
+
+    let result = prices.filter(p => !isDiaChain(p.supermarket));
 
     // Filter by offers if enabled
     if (showOnlyOffers) {
@@ -117,112 +247,17 @@ const ResultsView: React.FC<ResultsViewProps> = ({ product, prices, onAddToList,
       {/* Grid of Results */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {processedPrices.length > 0 ? (
-          processedPrices.map((p, index) => {
-            const isBestPrice = index === 0 && p.inStock && p.price > 0;
-            
-            return (
-              <div 
-                key={`${p.id}-${p.url}`} 
-                className={`group bg-white rounded-3xl p-5 shadow-sm border-2 transition-all flex flex-col relative overflow-hidden active:scale-[0.98] ${
-                  !p.inStock ? 'opacity-60 grayscale border-transparent' : 
-                  p.isOffer ? 'border-primary-orange/20 bg-orange-50/5' : 
-                  isBestPrice ? 'border-primary-green/30 shadow-green-100 shadow-xl' : 'border-slate-100'
-                }`}
-              >
-                {/* Image Section - Large & Centered */}
-                <div className="w-full h-48 mb-4 bg-white rounded-2xl overflow-hidden relative group-hover:scale-105 transition-transform duration-500">
-                  {p.imageUrl ? (
-                    <img src={p.imageUrl} alt={p.productName} className="w-full h-full object-contain p-4" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center bg-slate-50">
-                        <ShoppingBag className="text-slate-200" size={64} />
-                    </div>
-                  )}
-
-                  {/* Badges Overlay */}
-                  <div className="absolute top-2 left-2 flex flex-col gap-1">
-                    <span className="text-[10px] font-black uppercase tracking-wider text-primary-green bg-white/95 backdrop-blur shadow-sm px-3 py-1 rounded-full border border-green-100/50">
-                      {p.supermarket}
-                    </span>
-                    {p.isOffer && (
-                      <span className="text-[10px] font-black uppercase tracking-widest text-white bg-primary-orange px-3 py-1 rounded-full shadow-md flex items-center gap-1 animate-pulse">
-                        <Zap size={10} className="fill-current" /> OFERTA
-                      </span>
-                    )}
-                  </div>
-
-                  {isBestPrice && (
-                    <div className="absolute top-0 right-4 bg-primary-green text-white text-[10px] font-black px-4 py-1.5 rounded-b-xl shadow-lg z-10">
-                      MEJOR PRECIO
-                    </div>
-                  )}
-                </div>
-
-                {/* Info Section */}
-                <div className="flex flex-col flex-1 min-w-0">
-                  <h3 className="font-bold text-slate-800 text-base line-clamp-2 leading-tight mb-4 min-h-[3rem]">
-                    {p.productName || queryName}
-                  </h3>
-                  
-                  <div className="flex flex-col gap-3 mt-auto">
-                    {/* Price Info */}
-                    <div className="flex items-center justify-between">
-                        <div className="flex flex-col">
-                            <div className="flex items-baseline gap-2">
-                                <span className="text-2xl font-black text-slate-900">${p.price.toLocaleString('es-AR')}</span>
-                                {p.originalPrice && p.originalPrice > p.price && (
-                                    <span className="text-sm text-slate-400 line-through font-medium">${p.originalPrice.toLocaleString('es-AR')}</span>
-                                )}
-                            </div>
-                            {p.isOffer && p.originalPrice && p.originalPrice > p.price && (
-                               <span className="text-[11px] font-bold text-primary-orange flex items-center gap-1">
-                                 Ahorrás ${(p.originalPrice - p.price).toLocaleString('es-AR')}
-                               </span>
-                            )}
-                        </div>
-
-                        {/* Add Button - Large Target */}
-                        <button 
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                if (p.inStock) {
-                                  // Filtrar precios similares para este producto específico
-                                  // Queremos comparar LO MISMO en otros supers
-                                  const relevantPrices = prices.filter(other => {
-                                    const sameBrand = other.brand?.toLowerCase() === p.brand?.toLowerCase();
-                                    const similarName = other.productName?.toLowerCase().includes(p.productName?.split(' ')[0].toLowerCase() || '');
-                                    return sameBrand || similarName;
-                                  });
-                                  onAddToList(product, p, relevantPrices);
-                                }
-                            }}
-                            disabled={!p.inStock}
-                            className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all shadow-lg shrink-0 ${
-                                p.inStock 
-                                ? 'bg-primary-green hover:bg-green-600 text-white active:scale-90 shadow-green-100' 
-                                : 'bg-slate-100 text-slate-300 cursor-not-allowed'
-                            }`}
-                        >
-                            <Plus size={32} />
-                        </button>
-                    </div>
-
-                    {/* External Link */}
-                    {p.url && (
-                        <a 
-                            href={p.url} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="bg-slate-50 py-3 rounded-xl text-[11px] font-black text-slate-500 flex items-center justify-center gap-2 hover:bg-slate-100 transition-colors uppercase tracking-widest border border-slate-100"
-                        >
-                            Ver en tienda externa <ExternalLink size={12} />
-                        </a>
-                    )}
-                  </div>
-                </div>
-              </div>
-            );
-          })
+          processedPrices.map((p, index) => (
+            <ProductCard 
+              key={`${p.id}-${p.url}`}
+              productItem={p}
+              allProductPrices={prices}
+              originalProduct={product}
+              isBestPrice={index === 0 && p.inStock && p.price > 0}
+              onAddToList={onAddToList}
+              queryName={queryName}
+            />
+          ))
         ) : (
           <div className="col-span-full text-center py-20 bg-white rounded-[40px] border-2 border-dashed border-slate-100 shadow-inner">
             <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-6">
@@ -255,4 +290,3 @@ const ResultsView: React.FC<ResultsViewProps> = ({ product, prices, onAddToList,
 };
 
 export default ResultsView;
-

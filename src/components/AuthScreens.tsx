@@ -1,5 +1,5 @@
-
-import { CheckCircle2, MapPin, CreditCard, LogIn, ArrowRight } from 'lucide-react';
+import { useState } from 'react';
+import { CheckCircle2, MapPin, CreditCard, LogIn, ArrowRight, AlertCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 export const LandingScreen = ({ onNavigate }: { onNavigate: () => void }) => {
@@ -83,6 +83,21 @@ export const LandingScreen = ({ onNavigate }: { onNavigate: () => void }) => {
 
 export const LoginScreen = () => {
   const { login } = useAuth();
+  const [error, setError] = useState<string | null>(null);
+
+  const handleLogin = async () => {
+    setError(null);
+    const errorCode = await login();
+    if (errorCode) {
+      if (errorCode === 'auth/unauthorized-domain') {
+        setError("Este dominio no está autorizado en Firebase. Añade 'localhost' o tu dominio en la consola de Firebase.");
+      } else if (errorCode === 'auth/popup-blocked') {
+        setError("El navegador bloqueó la ventana emergente. Por favor, permite las ventanas emergentes e intenta de nuevo.");
+      } else {
+        setError(`Error de conexión: ${errorCode}`);
+      }
+    }
+  };
 
   return (
     <div className="flex flex-col min-h-screen bg-[#f7f8fa] overflow-hidden relative">
@@ -163,12 +178,27 @@ export const LoginScreen = () => {
       </div>
  
       <div className="flex flex-col items-center px-8 pt-4 pb-6 text-center z-10 w-full max-w-sm mx-auto">
+        {error && (
+          <div className="bg-red-50 border border-red-100 rounded-2xl p-4 mb-4 flex items-start gap-3 animate-in fade-in slide-in-from-top-4 duration-300">
+            <AlertCircle className="text-red-500 shrink-0 mt-0.5" size={18} />
+            <div className="flex flex-col gap-1">
+              <p className="text-xs font-black text-red-700 leading-tight">
+                {error === 'auth/unauthorized-domain' ? 'Dominio no autorizado' : 'Error al iniciar sesión'}
+              </p>
+              <p className="text-[10px] font-bold text-red-600/80 leading-relaxed">
+                {error === 'auth/unauthorized-domain' 
+                  ? 'Debes agregar "localhost" y "robertofiori.github.io" en la consola de Firebase (Autenticación > Configuración > Dominios autorizados).' 
+                  : (error === 'auth/invalid-credential' ? 'Usuario o contraseña incorrectos.' : 'Ocurrió un problema técnico. Intenta de nuevo.')}
+              </p>
+            </div>
+          </div>
+        )}
         <p className="text-[#64748b] mb-4 max-w-[280px] font-bold text-[14px] leading-relaxed">
           Inicia sesión con tu cuenta de Google para guardar tus listas, métodos de pago y recibir alertas.
         </p>
  
         <button
-          onClick={login}
+          onClick={handleLogin}
           className="w-full bg-white text-slate-800 font-extrabold text-[15px] py-[16px] px-6 rounded-[20px] shadow-md border border-slate-100 hover:shadow-lg flex items-center justify-center gap-3 transition-all active:scale-[0.98]"
         >
           <LogIn size={20} className="text-primary-green" />

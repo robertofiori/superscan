@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Search, X } from 'lucide-react';
 import { fetchSearchSuggestions, type ProductSuggestion } from '../api';
 
@@ -114,9 +114,18 @@ const AutocompleteSearch: React.FC<AutocompleteSearchProps> = ({ onSearch, place
 
   return (
     <div className="w-full relative" ref={dropdownRef}>
-      <form onSubmit={handleSubmit} className="relative">
-        <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
-          <Search size={20} className={loading ? 'text-primary-green animate-bounce' : 'text-slate-400'} />
+      <form onSubmit={handleSubmit} className="relative group">
+        <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none z-10">
+          <div className={`transition-all duration-500 ${loading ? 'scale-110' : 'group-focus-within:scale-110 group-focus-within:rotate-12'}`}>
+            <Search 
+              size={20} 
+              className={`transition-colors duration-300 ${
+                loading 
+                  ? 'text-primary-green animate-pulse' 
+                  : 'text-slate-400 group-focus-within:text-primary-green'
+              }`} 
+            />
+          </div>
         </div>
         <input 
           type="text" 

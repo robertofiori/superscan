@@ -21,7 +21,7 @@ interface AuthContextType {
   user: User | null;
   userData: UserData | null;
   loading: boolean;
-  login: () => Promise<void>;
+  login: () => Promise<string | null>;
   logout: () => Promise<void>;
   updateUserData: (data: Partial<UserData>) => Promise<void>;
 }
@@ -68,8 +68,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => unsubscribe();
   }, []);
 
-  const login = async () => {
-    await signInWithPopup(auth, googleProvider);
+  const login = async (): Promise<string | null> => {
+    try {
+      await signInWithPopup(auth, googleProvider);
+      return null;
+    } catch (error: any) {
+      console.error("Login Error:", error.code, error.message);
+      return error.code || "unknown_error";
+    }
   };
 
   const logout = async () => {
