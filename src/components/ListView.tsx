@@ -13,8 +13,8 @@ import { calculateOptimization } from '../utils/basketOptimizer';
 
 interface ListViewProps {
   items: ShoppingListItem[];
-  onUpdateQuantity: (index: number, delta: number) => void;
-  onUpdatePrice: (index: number, newPrice: SupermarketPrice) => void;
+  onUpdateQuantity: (id: string, delta: number) => void;
+  onUpdatePrice: (id: string, newPrice: SupermarketPrice) => void;
   onClear: () => void;
 }
 
@@ -227,7 +227,6 @@ const ListView: React.FC<ListViewProps> = ({ items, onUpdateQuantity, onUpdatePr
                   {store}
                 </h3>
                 {storeItems.map((item, idx) => {
-                  const itemIndex = items.indexOf(item);
                   const betterPrice = (item.allPrices || [])
                     .filter(p => p.inStock && p.price > 0)
                     .sort((a, b) => {
@@ -300,14 +299,14 @@ const ListView: React.FC<ListViewProps> = ({ items, onUpdateQuantity, onUpdatePr
                       </div>
                       <div className="flex items-center bg-slate-100 rounded-xl px-1 py-1">
                         <button 
-                           onClick={() => onUpdateQuantity(itemIndex, -1)}
+                           onClick={() => onUpdateQuantity(item.id, -1)}
                            className="w-11 h-11 flex items-center justify-center text-slate-500 active:bg-slate-200 rounded-lg transition-colors"
                         >
                           <Minus size={20} />
                         </button>
                         <span className="px-2 font-black text-sm w-8 text-center">{item.quantity}</span>
                         <button 
-                           onClick={() => onUpdateQuantity(itemIndex, 1)}
+                           onClick={() => onUpdateQuantity(item.id, 1)}
                            className="w-11 h-11 flex items-center justify-center text-primary-green active:bg-green-100 rounded-lg transition-colors"
                         >
                           <Plus size={20} />
@@ -316,7 +315,7 @@ const ListView: React.FC<ListViewProps> = ({ items, onUpdateQuantity, onUpdatePr
 
                       {isBetter && (
                         <button 
-                          onClick={() => onUpdatePrice(itemIndex, betterPrice)}
+                          onClick={() => onUpdatePrice(item.id, betterPrice)}
                           className="absolute -top-2 right-4 bg-emerald-500 text-white px-3 py-1.5 rounded-full text-[9px] font-black shadow-lg border-2 border-white flex items-center gap-2 active:scale-95 transition-transform"
                         >
                           <TrendingDown size={12} /> 

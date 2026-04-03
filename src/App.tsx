@@ -155,17 +155,20 @@ const AppContent = () => {
   
   const handleAddToList = (prod: ProductData, best: SupermarketPrice, allPrices: SupermarketPrice[]) => {
     setListItems(prev => {
-      // Usar EAN o ID del producto para unicidad, ya que 'prod.code' puede ser la query de búsqueda
-      const productUniqueId = best.ean || best.id;
-      const existingIdx = prev.findIndex(item => (item.price.ean || item.price.id) === productUniqueId);
+      // Usar EAN o URL para unicidad absoluta del producto-oferta
+      // Si no hay EAN ni URL, usamos nombre + supermercado
+      const productUniqueId = best.ean || best.url || `${best.productName}-${best.supermarket}`;
+      const existingIdx = prev.findIndex(item => 
+        (item.price.ean || item.price.url || `${item.price.productName}-${item.price.supermarket}`) === productUniqueId
+      );
       
       if (existingIdx >= 0) {
         const neue = [...prev];
         neue[existingIdx] = { 
           ...neue[existingIdx], 
           quantity: neue[existingIdx].quantity + 1,
-          price: best, // Update to the "last added" price selection
-          allPrices: allPrices // Update with latest comparison data
+          price: best, 
+          allPrices: allPrices 
         };
         return neue;
       }
@@ -251,19 +254,23 @@ const AppContent = () => {
         return (
           <ListView 
             items={listItems} 
-            onUpdateQuantity={(idx, delta) => {
+            onUpdateQuantity={(itemId, delta) => {
               setListItems(prev => {
-                const nueva = [...prev];
-                nueva[idx].quantity += delta;
-                if (nueva[idx].quantity <= 0) nueva.splice(idx, 1);
-                return nueva;
+                return prev.map(item => {
+                  if (item.id === itemId) {
+                    const newQuantity = item.quantity + delta;
+                    return { ...item, quantity: newQuantity };
+                  }
+                  return item;
+                }).filter(item => item.quantity > 0);
               });
             }}
-            onUpdatePrice={(idx, newPrice) => {
+            onUpdatePrice={(itemId, newPrice) => {
               setListItems(prev => {
-                const neue = [...prev];
-                neue[idx] = { ...neue[idx], price: newPrice };
-                return neue;
+                return prev.map(item => {
+                  if (item.id === itemId) return { ...item, price: newPrice };
+                  return item;
+                });
               });
             }}
             onClear={() => setListItems([])}
