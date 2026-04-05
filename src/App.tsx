@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Layout from './components/Layout';
 import HomeView from './components/HomeView';
 import ResultsView from './components/ResultsView';
@@ -75,6 +75,7 @@ const AppContent = () => {
 
   const [profileInitialTab, setProfileInitialTab] = useState<'settings' | 'payments'>('settings');
   const [isDataLoaded, setIsDataLoaded] = useState(false);
+  const isDataLoadedRef = useRef(false);
 
   // Suscribirse a cambios en Firestore (Lista activa y Listas guardadas)
   useEffect(() => {
@@ -82,20 +83,22 @@ const AppContent = () => {
       setListItems([]);
       setSavedLists([]);
       setIsDataLoaded(false);
+      isDataLoadedRef.current = false;
       return;
     }
 
     // Cargar datos iniciales una sola vez para evitar bucles
     const unsubscribe = subscribeToList(user.uid, (active, saved) => {
-      if (!isDataLoaded) {
+      if (!isDataLoadedRef.current) {
         setListItems(active || []);
         setIsDataLoaded(true);
+        isDataLoadedRef.current = true;
       }
       setSavedLists(saved || []);
     });
 
     return () => unsubscribe();
-  }, [user, isDataLoaded]);
+  }, [user]);
 
   // Guardar lista en Firestore ante cualquier cambio, pero solo después de cargar los iniciales
   useEffect(() => {
@@ -348,7 +351,7 @@ const AppContent = () => {
       activeView={activeView} 
       onViewChange={handleViewChange} 
       cartCount={listItems.reduce((acc, item) => acc + item.quantity, 0)}
-      onScan={() => handleViewChange('scanner')}
+      onScan={() => setScanning(true)}
       showLocationModal={showLocationModal}
       onShowLocation={() => setShowLocationModal(true)}
       onCloseLocation={() => setShowLocationModal(false)}
