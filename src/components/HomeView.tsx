@@ -88,13 +88,17 @@ const HomeView: React.FC<HomeViewProps> = ({ onSearch, onViewChange, onShowLocat
         const docRef = doc(db, "config", "sucursales");
         const snap = await getDoc(docRef);
         if (!snap.exists()) {
-          console.log("Añadiendo sucursales a Firebase por primera vez...");
-          await setDoc(docRef, RAW_STORES_DATA);
+          try {
+            await setDoc(docRef, RAW_STORES_DATA);
+          } catch (writeErr: any) {
+            // Silently fail write if no permissions, we use local data anyway
+          }
         } else {
           storesData = snap.data() as typeof RAW_STORES_DATA;
         }
-      } catch (err) {
-        console.error("Error al obtener sucursales de Firebase:", err);
+      } catch (err: any) {
+        // Fallback to local data on error
+        storesData = RAW_STORES_DATA;
       }
 
       if (!isMounted) return;

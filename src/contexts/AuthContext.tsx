@@ -37,27 +37,42 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setUser(user);
       if (user) {
-        // Fetch custom data from Firestore
-        const docRef = doc(db, 'users', user.uid);
-        const docSnap = await getDoc(docRef);
-        
-        if (docSnap.exists()) {
-          setUserData(docSnap.data() as UserData);
-        } else {
-          // Initialize default data
-          const initialData: UserData = {
+        try {
+          // Fetch custom data from Firestore
+          const docRef = doc(db, 'users', user.uid);
+          const docSnap = await getDoc(docRef);
+          
+          if (docSnap.exists()) {
+            setUserData(docSnap.data() as UserData);
+          } else {
+            // Initialize default data
+            const initialData: UserData = {
+              paymentMethods: [],
+              notifications: true,
+              avatarUrl: user.photoURL || undefined,
+              location: {
+                id: 'bhi',
+                city: 'Bahía Blanca',
+                province: 'Buenos Aires',
+                zipCode: '8000'
+              }
+            };
+            await setDoc(docRef, initialData);
+            setUserData(initialData);
+          }
+        } catch (error: any) {
+          console.error("Error fetching/setting user data:", error);
+          // Set some default data so the app doesn't crash completely
+          setUserData({
             paymentMethods: [],
             notifications: true,
-            avatarUrl: user.photoURL || undefined,
             location: {
               id: 'bhi',
               city: 'Bahía Blanca',
               province: 'Buenos Aires',
               zipCode: '8000'
             }
-          };
-          await setDoc(docRef, initialData);
-          setUserData(initialData);
+          });
         }
       } else {
         setUserData(null);

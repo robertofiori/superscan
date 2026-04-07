@@ -1,5 +1,7 @@
 {
   "projects": {
     "default": "elchango-81e77"
-  }
+  },
+  "targets": {},
+  "etags": {}
 }

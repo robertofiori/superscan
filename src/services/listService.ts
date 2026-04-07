@@ -121,5 +121,9 @@ export const subscribeToList = (uid: string, callback: (items: ShoppingListItem[
     } else {
       callback([], []);
     }
+  }, (error) => {
+    console.error("Error subscribing to list:", error);
+    // Unblock the UI even if there's an error
+    callback([], []);
   });
 };
