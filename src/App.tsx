@@ -10,7 +10,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { fetchProductInfo, getSupermarketPrices, type ProductData, type SupermarketPrice, type ShoppingListItem } from './api';
 import { AlertCircle, RefreshCw } from 'lucide-react';
 import { LandingScreen, LoginScreen } from './components/AuthScreens';
-import { saveUserList, subscribeToList, saveNamedList, deleteNamedList, renameNamedList, type SavedList } from './services/listService';
+import { saveUserList, subscribeToList, saveNamedList, updateNamedList, deleteNamedList, renameNamedList, type SavedList } from './services/listService';
 import React from 'react';
 
 // Simple Error Boundary to catch rendering crashes
@@ -66,6 +66,7 @@ const AppContent = () => {
   const [scanning, setScanning] = useState(false);
   const [listItems, setListItems] = useState<ShoppingListItem[]>([]);
   const [savedLists, setSavedLists] = useState<SavedList[]>([]);
+  const [activeSavedListId, setActiveSavedListId] = useState<string | null>(null);
   const [showLocationModal, setShowLocationModal] = useState(false);
   
   const [lastScannedCode, setLastScannedCode] = useState<string | null>(null);
@@ -82,6 +83,7 @@ const AppContent = () => {
     if (!user) {
       setListItems([]);
       setSavedLists([]);
+      setActiveSavedListId(null);
       setIsDataLoaded(false);
       isDataLoadedRef.current = false;
       return;
@@ -119,15 +121,30 @@ const AppContent = () => {
   const handleSaveNamedList = async (name: string) => {
     if (!user) return;
     try {
-      await saveNamedList(user.uid, name, listItems);
+      const newList = await saveNamedList(user.uid, name, listItems);
+      if (newList) {
+        setActiveSavedListId(newList.id);
+      }
     } catch (error: any) {
       alert(error.message || "Error al guardar la lista");
+    }
+  };
+
+  const handleUpdateNamedList = async (listId: string) => {
+    if (!user) return;
+    try {
+      await updateNamedList(user.uid, listId, listItems);
+    } catch (error: any) {
+      alert(error.message || "Error al actualizar la lista");
     }
   };
 
   const handleDeleteNamedList = async (listId: string) => {
     if (!user) return;
     await deleteNamedList(user.uid, listId);
+    if (activeSavedListId === listId) {
+      setActiveSavedListId(null);
+    }
   };
 
   const handleRenameNamedList = async (listId: string, newName: string) => {
@@ -137,9 +154,11 @@ const AppContent = () => {
 
   const handleLoadNamedList = (list: SavedList) => {
     setListItems(list.items);
+    setActiveSavedListId(list.id);
     // Forzamos guardado inmediato en el slot "active"
     if (user) saveUserList(user.uid, list.items);
   };
+
 
   // Effect to fetch data when a code is scanned or searched
   useEffect(() => {
@@ -305,6 +324,7 @@ const AppContent = () => {
           <ListView 
             items={listItems} 
             savedLists={savedLists}
+            activeSavedListId={activeSavedListId}
             onUpdateQuantity={handleUpdateQuantity}
             onUpdatePrice={(itemId, newPrice) => {
               setListItems(prev => {
@@ -314,11 +334,16 @@ const AppContent = () => {
                 });
               });
             }}
-            onClear={() => setListItems([])}
+            onClear={() => {
+              setListItems([]);
+              setActiveSavedListId(null);
+            }}
             onSaveNamedList={handleSaveNamedList}
+            onUpdateNamedList={handleUpdateNamedList}
             onDeleteNamedList={handleDeleteNamedList}
             onRenameNamedList={handleRenameNamedList}
             onLoadNamedList={handleLoadNamedList}
+            onUnlinkActiveList={() => setActiveSavedListId(null)}
           />
         );
       case 'profile':

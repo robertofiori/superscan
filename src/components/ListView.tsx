@@ -16,31 +16,46 @@ import { useState } from 'react';
 interface ListViewProps {
   items: ShoppingListItem[];
   savedLists: SavedList[];
+  activeSavedListId?: string | null;
   onUpdateQuantity: (id: string, delta: number) => void;
   onUpdatePrice: (id: string, newPrice: SupermarketPrice) => void;
   onClear: () => void;
   onSaveNamedList: (name: string) => Promise<void>;
+  onUpdateNamedList?: (listId: string) => Promise<void>;
   onDeleteNamedList: (listId: string) => Promise<void>;
   onRenameNamedList: (listId: string, newName: string) => Promise<void>;
   onLoadNamedList: (list: SavedList) => void;
+  onUnlinkActiveList?: () => void;
 }
 
 const ListView: React.FC<ListViewProps> = ({ 
   items, 
   savedLists,
+  activeSavedListId,
   onUpdateQuantity, 
   onUpdatePrice, 
   onClear,
   onSaveNamedList,
+  onUpdateNamedList,
   onDeleteNamedList,
   onRenameNamedList,
-  onLoadNamedList
+  onLoadNamedList,
+  onUnlinkActiveList
 }) => {
   const { userData } = useAuth();
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [newListName, setNewListName] = useState('');
   const [editingListId, setEditingListId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const activeSavedList = savedLists.find(l => l.id === activeSavedListId);
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3500);
+  };
 
   // Robust check for DIA chain matches api.ts
   const isDiaChain = (name: string) => {
@@ -179,6 +194,14 @@ const ListView: React.FC<ListViewProps> = ({
 
   return (
     <div className="flex flex-col gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-24">
+      {/* Banner de Notificación Toast */}
+      {toastMessage && (
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[110] bg-emerald-600 text-white font-black px-6 py-3 rounded-full shadow-2xl flex items-center gap-2 text-sm animate-in slide-in-from-top-4 duration-300 border-2 border-white">
+          <Save size={18} />
+          <span>{toastMessage}</span>
+        </div>
+      )}
+
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-black text-slate-800">Mi Lista</h2>
         {items.length > 0 && (
@@ -187,6 +210,29 @@ const ListView: React.FC<ListViewProps> = ({
           </button>
         )}
       </div>
+
+      {/* Indicador de Lista Activa si se ha cargado una lista guardada */}
+      {activeSavedList && (
+        <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-4 flex items-center justify-between shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="bg-emerald-500 text-white p-2 rounded-xl">
+              <Bookmark size={18} />
+            </div>
+            <div className="flex flex-col">
+              <span className="text-[10px] font-black uppercase tracking-wider text-emerald-600">Editando Lista Guardada</span>
+              <span className="font-black text-slate-800 text-base">{activeSavedList.name}</span>
+            </div>
+          </div>
+          {onUnlinkActiveList && (
+            <button 
+              onClick={onUnlinkActiveList} 
+              className="text-xs font-bold text-slate-500 hover:text-slate-700 bg-white/80 border border-slate-200 px-3 py-1.5 rounded-xl transition-all"
+            >
+              Desvincular
+            </button>
+          )}
+        </div>
+      )}
 
       {items.length === 0 ? (
         <div className="text-center py-16 px-4 bg-white rounded-[32px] border border-dashed border-slate-200">
@@ -398,16 +444,48 @@ const ListView: React.FC<ListViewProps> = ({
               <Share2 size={20} />
               <span>Compartir por WhatsApp</span>
             </button>
-            <button 
-              onClick={() => setShowSaveModal(true)}
-              disabled={savedLists.length >= 3}
-              className={`w-full font-black flex items-center justify-center gap-3 py-4 rounded-2xl shadow-xl transition-all active:scale-95 border-b-4 ${
-                savedLists.length >= 3 ? 'bg-slate-100 text-slate-400 border-slate-200' : 'bg-primary-orange text-white border-orange-700'
-              }`}
-            >
-              <Save size={20} />
-              <span>{savedLists.length >= 3 ? 'Límite de Listas Alcanzado' : 'Guardar esta Lista'}</span>
-            </button>
+
+            {/* Botón Principal de Guardado: Si hay una lista activa, actualiza directamente */}
+            {activeSavedList ? (
+              <>
+                <button 
+                  onClick={async () => {
+                    if (onUpdateNamedList && activeSavedList) {
+                      setIsSaving(true);
+                      await onUpdateNamedList(activeSavedList.id);
+                      setIsSaving(false);
+                      showToast(`¡Cambios guardados en "${activeSavedList.name}"!`);
+                    }
+                  }}
+                  disabled={isSaving}
+                  className="w-full bg-primary-green hover:bg-emerald-600 text-white font-black flex items-center justify-center gap-3 py-4 rounded-2xl shadow-xl transition-all active:scale-95 border-b-4 border-emerald-700 text-base"
+                >
+                  <Save size={20} />
+                  <span>{isSaving ? 'Guardando cambios...' : `Guardar cambios en "${activeSavedList.name}"`}</span>
+                </button>
+
+                {savedLists.length < 3 && (
+                  <button 
+                    onClick={() => setShowSaveModal(true)}
+                    className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold flex items-center justify-center gap-2 py-3.5 rounded-2xl transition-all active:scale-95 text-sm"
+                  >
+                    <Plus size={16} />
+                    <span>Guardar como una lista nueva</span>
+                  </button>
+                )}
+              </>
+            ) : (
+              <button 
+                onClick={() => setShowSaveModal(true)}
+                disabled={savedLists.length >= 3}
+                className={`w-full font-black flex items-center justify-center gap-3 py-4 rounded-2xl shadow-xl transition-all active:scale-95 border-b-4 ${
+                  savedLists.length >= 3 ? 'bg-slate-100 text-slate-400 border-slate-200' : 'bg-primary-orange text-white border-orange-700'
+                }`}
+              >
+                <Save size={20} />
+                <span>{savedLists.length >= 3 ? 'Límite de Listas Alcanzado (3/3)' : 'Guardar esta Lista'}</span>
+              </button>
+            )}
           </div>
         </>
       )}
@@ -424,69 +502,91 @@ const ListView: React.FC<ListViewProps> = ({
           <p className="text-sm text-slate-400 font-medium italic">Aún no has guardado ninguna lista permanente.</p>
         ) : (
           <div className="grid grid-cols-1 gap-3">
-            {savedLists.map((list) => (
-              <div key={list.id} className="bg-white rounded-3xl p-4 border border-slate-100 shadow-sm flex flex-col gap-3 group">
-                <div className="flex items-center justify-between">
-                  {editingListId === list.id ? (
-                    <div className="flex items-center gap-2 flex-1 mr-2">
-                       <input 
-                        autoFocus
-                        value={editName}
-                        onChange={(e) => setEditName(e.target.value)}
-                        className="flex-1 bg-slate-50 border-2 border-primary-green rounded-xl px-3 py-1.5 font-bold text-sm outline-none"
-                        onKeyPress={(e) => e.key === 'Enter' && onRenameNamedList(list.id, editName).then(() => setEditingListId(null))}
-                       />
-                       <button onClick={() => { onRenameNamedList(list.id, editName); setEditingListId(null); }} className="p-2 bg-primary-green text-white rounded-lg">
-                         <Save size={14} />
-                       </button>
-                       <button onClick={() => setEditingListId(null)} className="p-2 bg-slate-100 text-slate-500 rounded-lg">
-                         <X size={14} />
-                       </button>
-                    </div>
-                  ) : (
-                    <div className="flex flex-col">
-                      <span className="font-black text-slate-800 flex items-center gap-2">
-                        {list.name}
-                      </span>
-                      <span className="text-[10px] font-bold text-slate-400 uppercase">
-                        {list.items.length} productos • {new Date(list.updatedAt).toLocaleDateString()}
-                      </span>
-                    </div>
-                  )}
-                  
+            {savedLists.map((list) => {
+              const isActive = activeSavedListId === list.id;
+
+              return (
+                <div 
+                  key={list.id} 
+                  className={`bg-white rounded-3xl p-4 shadow-sm flex flex-col gap-3 transition-all ${
+                    isActive ? 'border-2 border-primary-green bg-green-50/20' : 'border border-slate-100'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    {editingListId === list.id ? (
+                      <div className="flex items-center gap-2 flex-1 mr-2">
+                         <input 
+                          autoFocus
+                          value={editName}
+                          onChange={(e) => setEditName(e.target.value)}
+                          className="flex-1 bg-slate-50 border-2 border-primary-green rounded-xl px-3 py-1.5 font-bold text-sm outline-none"
+                          onKeyPress={(e) => e.key === 'Enter' && onRenameNamedList(list.id, editName).then(() => setEditingListId(null))}
+                         />
+                         <button onClick={() => { onRenameNamedList(list.id, editName); setEditingListId(null); }} className="p-2 bg-primary-green text-white rounded-lg">
+                           <Save size={14} />
+                         </button>
+                         <button onClick={() => setEditingListId(null)} className="p-2 bg-slate-100 text-slate-500 rounded-lg">
+                           <X size={14} />
+                         </button>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col">
+                        <div className="flex items-center gap-2">
+                          <span className="font-black text-slate-800 text-base">
+                            {list.name}
+                          </span>
+                          {isActive && (
+                            <span className="bg-primary-green text-white text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider">
+                              EDITANDO
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase">
+                          {list.items.length} productos • Actualizada {new Date(list.updatedAt).toLocaleDateString()}
+                        </span>
+                      </div>
+                    )}
+                    
+                    {!editingListId && (
+                      <div className="flex items-center gap-1">
+                         <button 
+                           onClick={() => { setEditingListId(list.id); setEditName(list.name); }}
+                           className="p-2 text-slate-400 hover:text-primary-green transition-colors"
+                         >
+                           <Edit2 size={16} />
+                         </button>
+                         <button 
+                           onClick={() => onDeleteNamedList(list.id)}
+                           className="p-2 text-slate-400 hover:text-red-500 transition-colors"
+                         >
+                           <Trash2 size={16} />
+                         </button>
+                      </div>
+                    )}
+                  </div>
+
                   {!editingListId && (
-                    <div className="flex items-center gap-1">
-                       <button 
-                         onClick={() => { setEditingListId(list.id); setEditName(list.name); }}
-                         className="p-2 text-slate-400 hover:text-primary-green transition-colors"
-                       >
-                         <Edit2 size={16} />
-                       </button>
-                       <button 
-                         onClick={() => onDeleteNamedList(list.id)}
-                         className="p-2 text-slate-400 hover:text-red-500 transition-colors"
-                       >
-                         <Trash2 size={16} />
-                       </button>
-                    </div>
+                    isActive ? (
+                      <div className="w-full bg-primary-green/10 text-primary-green font-black py-2.5 rounded-2xl flex items-center justify-center gap-1 text-xs">
+                        ✓ Editando esta lista actualmente
+                      </div>
+                    ) : (
+                      <button 
+                        onClick={() => onLoadNamedList(list)}
+                        className="w-full bg-slate-50 hover:bg-primary-green/10 text-slate-600 hover:text-primary-green font-black py-2.5 rounded-2xl flex items-center justify-center gap-2 transition-all active:scale-95 text-xs"
+                      >
+                        Cargar esta Lista <ChevronRight size={14} />
+                      </button>
+                    )
                   )}
                 </div>
-
-                {!editingListId && (
-                  <button 
-                    onClick={() => onLoadNamedList(list)}
-                    className="w-full bg-slate-50 hover:bg-primary-green/10 text-slate-600 hover:text-primary-green font-black py-2.5 rounded-2xl flex items-center justify-center gap-2 transition-all active:scale-95 text-xs"
-                  >
-                    Cargar esta Lista <ChevronRight size={14} />
-                  </button>
-                )}
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
 
-      {/* Modal para Nombre de Lista */}
+      {/* Modal para Nombre de Lista Nueva */}
       {showSaveModal && (
         <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
            <div className="w-full max-w-sm bg-white rounded-[40px] p-6 shadow-2xl animate-in slide-in-from-bottom-10 duration-500">
@@ -516,6 +616,7 @@ const ListView: React.FC<ListViewProps> = ({
                     onSaveNamedList(newListName.trim()).then(() => {
                       setShowSaveModal(false);
                       setNewListName('');
+                      showToast(`¡Lista "${newListName.trim()}" creada con éxito!`);
                     });
                   }
                 }}
@@ -531,3 +632,4 @@ const ListView: React.FC<ListViewProps> = ({
 };
 
 export default ListView;
+

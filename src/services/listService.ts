@@ -98,6 +98,34 @@ export const renameNamedList = async (uid: string, listId: string, newName: stri
   }
 };
 
+export const updateNamedList = async (uid: string, listId: string, items: ShoppingListItem[], newName?: string) => {
+  try {
+    const docRef = doc(db, COLLECTION_NAME, uid);
+    const docSnap = await getDoc(docRef);
+    if (!docSnap.exists()) return;
+
+    const currentSaved = (docSnap.data().saved as SavedList[]) || [];
+    const sanitizedItems = items.map(item => sanitizeData(item));
+    const updated = currentSaved.map(l => {
+      if (l.id === listId) {
+        return {
+          ...l,
+          name: newName ?? l.name,
+          items: sanitizedItems,
+          updatedAt: new Date().toISOString()
+        };
+      }
+      return l;
+    });
+
+    await updateDoc(docRef, { saved: updated });
+  } catch (error) {
+    console.error("Error updating saved list:", error);
+    throw error;
+  }
+};
+
+
 export const fetchSavedLists = async (uid: string): Promise<SavedList[]> => {
   try {
     const docRef = doc(db, COLLECTION_NAME, uid);
