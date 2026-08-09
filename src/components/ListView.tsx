@@ -2,7 +2,7 @@ import React from 'react';
 import { 
   ShoppingBasket, Trash2, Plus, Minus, Share2, 
   ExternalLink, Download, Sparkles, 
-  TrendingDown, Store, Save, Bookmark, Edit2, X, ChevronRight
+  TrendingDown, Store, Save, Bookmark, Edit2, X, ChevronRight, RefreshCw
 } from 'lucide-react';
 import { type ShoppingListItem, type SupermarketPrice } from '../api';
 import { useAuth } from '../contexts/AuthContext';
@@ -445,7 +445,7 @@ const ListView: React.FC<ListViewProps> = ({
               <span>Compartir por WhatsApp</span>
             </button>
 
-            {/* Botón Principal de Guardado: Si hay una lista activa, actualiza directamente */}
+            {/* Botón Principal de Guardado: Si hay una lista activa, actualiza directamente con leyenda 'Actualizar Lista' e íconos de diskette y actualizar */}
             {activeSavedList ? (
               <>
                 <button 
@@ -454,25 +454,27 @@ const ListView: React.FC<ListViewProps> = ({
                       setIsSaving(true);
                       await onUpdateNamedList(activeSavedList.id);
                       setIsSaving(false);
-                      showToast(`¡Cambios guardados en "${activeSavedList.name}"!`);
+                      showToast(`¡Lista "${activeSavedList.name}" actualizada con éxito!`);
                     }
                   }}
                   disabled={isSaving}
-                  className="w-full bg-primary-green hover:bg-emerald-600 text-white font-black flex items-center justify-center gap-3 py-4 rounded-2xl shadow-xl transition-all active:scale-95 border-b-4 border-emerald-700 text-base"
+                  className="w-full bg-primary-green hover:bg-emerald-600 text-white font-black flex items-center justify-center gap-2 py-4 rounded-2xl shadow-xl transition-all active:scale-95 border-b-4 border-emerald-700 text-base"
                 >
                   <Save size={20} />
-                  <span>{isSaving ? 'Guardando cambios...' : `Guardar cambios en "${activeSavedList.name}"`}</span>
+                  <RefreshCw size={18} className={isSaving ? 'animate-spin' : ''} />
+                  <span>{isSaving ? 'Actualizando...' : 'Actualizar Lista'}</span>
                 </button>
 
-                {savedLists.length < 3 && (
-                  <button 
-                    onClick={() => setShowSaveModal(true)}
-                    className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold flex items-center justify-center gap-2 py-3.5 rounded-2xl transition-all active:scale-95 text-sm"
-                  >
-                    <Plus size={16} />
-                    <span>Guardar como una lista nueva</span>
-                  </button>
-                )}
+                <button 
+                  onClick={() => setShowSaveModal(true)}
+                  disabled={savedLists.length >= 3}
+                  className={`w-full font-black flex items-center justify-center gap-3 py-4 rounded-2xl shadow-xl transition-all active:scale-95 border-b-4 ${
+                    savedLists.length >= 3 ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed' : 'bg-primary-orange text-white border-orange-700'
+                  }`}
+                >
+                  <Save size={20} />
+                  <span>{savedLists.length >= 3 ? 'Límite de Listas Alcanzado (3/3)' : 'Guardar como NUEVA Lista'}</span>
+                </button>
               </>
             ) : (
               <button 
@@ -483,7 +485,7 @@ const ListView: React.FC<ListViewProps> = ({
                 }`}
               >
                 <Save size={20} />
-                <span>{savedLists.length >= 3 ? 'Límite de Listas Alcanzado (3/3)' : 'Guardar esta Lista'}</span>
+                <span>{savedLists.length >= 3 ? 'Límite de Listas Alcanzado (3/3)' : 'Guardar como NUEVA Lista'}</span>
               </button>
             )}
           </div>

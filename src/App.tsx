@@ -8,7 +8,7 @@ import Scanner from './components/Scanner';
 import OffersView from './components/OffersView';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { fetchProductInfo, getSupermarketPrices, type ProductData, type SupermarketPrice, type ShoppingListItem } from './api';
-import { AlertCircle, RefreshCw } from 'lucide-react';
+import { AlertCircle, RefreshCw, AlertTriangle, Save } from 'lucide-react';
 import { LandingScreen, LoginScreen } from './components/AuthScreens';
 import { saveUserList, subscribeToList, saveNamedList, updateNamedList, deleteNamedList, renameNamedList, type SavedList } from './services/listService';
 import React from 'react';
@@ -67,6 +67,9 @@ const AppContent = () => {
   const [listItems, setListItems] = useState<ShoppingListItem[]>([]);
   const [savedLists, setSavedLists] = useState<SavedList[]>([]);
   const [activeSavedListId, setActiveSavedListId] = useState<string | null>(null);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [showUnsavedModal, setShowUnsavedModal] = useState(false);
+  const [pendingTargetView, setPendingTargetView] = useState<string | null>(null);
   const [showLocationModal, setShowLocationModal] = useState(false);
   
   const [lastScannedCode, setLastScannedCode] = useState<string | null>(null);
@@ -84,6 +87,7 @@ const AppContent = () => {
       setListItems([]);
       setSavedLists([]);
       setActiveSavedListId(null);
+      setHasUnsavedChanges(false);
       setIsDataLoaded(false);
       isDataLoadedRef.current = false;
       return;
@@ -102,6 +106,28 @@ const AppContent = () => {
     return () => unsubscribe();
   }, [user]);
 
+  // Marcar cambios no guardados al modificar los items de la lista
+  useEffect(() => {
+    if (!isDataLoaded) return;
+    if (listItems.length > 0) {
+      setHasUnsavedChanges(true);
+    }
+  }, [listItems, isDataLoaded]);
+
+  // Advertencia antes de cerrar/recargar el navegador
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges && listItems.length > 0) {
+        const message = "Tu lista no fue guardada o actualizada - Si no la guardas/actualizas perderás la lista";
+        e.preventDefault();
+        e.returnValue = message;
+        return message;
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedChanges, listItems]);
+
   // Guardar lista en Firestore ante cualquier cambio, pero solo después de cargar los iniciales
   useEffect(() => {
     if (!user || !isDataLoaded) return;
@@ -115,6 +141,11 @@ const AppContent = () => {
 
   const handleViewChange = (view: string, tab?: 'settings' | 'payments') => {
     if (tab) setProfileInitialTab(tab);
+    if (activeView === 'list' && view !== 'list' && hasUnsavedChanges && listItems.length > 0) {
+      setPendingTargetView(view);
+      setShowUnsavedModal(true);
+      return;
+    }
     setActiveView(view);
   };
 
@@ -124,6 +155,7 @@ const AppContent = () => {
       const newList = await saveNamedList(user.uid, name, listItems);
       if (newList) {
         setActiveSavedListId(newList.id);
+        setHasUnsavedChanges(false);
       }
     } catch (error: any) {
       alert(error.message || "Error al guardar la lista");
@@ -134,6 +166,7 @@ const AppContent = () => {
     if (!user) return;
     try {
       await updateNamedList(user.uid, listId, listItems);
+      setHasUnsavedChanges(false);
     } catch (error: any) {
       alert(error.message || "Error al actualizar la lista");
     }
@@ -155,6 +188,7 @@ const AppContent = () => {
   const handleLoadNamedList = (list: SavedList) => {
     setListItems(list.items);
     setActiveSavedListId(list.id);
+    setHasUnsavedChanges(false);
     // Forzamos guardado inmediato en el slot "active"
     if (user) saveUserList(user.uid, list.items);
   };
@@ -369,6 +403,7 @@ const AppContent = () => {
 
   const handleClearList = () => {
     setListItems([]);
+    setHasUnsavedChanges(false);
   };
 
   return (
@@ -387,6 +422,53 @@ const AppContent = () => {
       {renderView()}
       {scanning && (
         <Scanner onClose={() => setScanning(false)} onScanSuccess={handleScanSuccess} />
+      )}
+
+      {/* Modal de Advertencia de Lista no Guardada */}
+      {showUnsavedModal && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="w-full max-w-sm bg-white rounded-[36px] p-6 shadow-2xl animate-in zoom-in-95 duration-200 border-4 border-amber-400 flex flex-col gap-5 text-center">
+            <div className="w-16 h-16 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto border-4 border-amber-50">
+              <AlertTriangle size={32} />
+            </div>
+            
+            <div className="flex flex-col gap-2">
+              <h3 className="text-lg font-black text-slate-800 leading-tight">
+                Tu lista no fue guardada o actualizada
+              </h3>
+              <p className="text-slate-500 font-bold text-xs leading-relaxed">
+                Si no la guardas/actualizas perderás la lista
+              </p>
+            </div>
+
+            <div className="flex gap-3 mt-2">
+              <button 
+                onClick={() => {
+                  setShowUnsavedModal(false);
+                  setHasUnsavedChanges(false);
+                  if (pendingTargetView) {
+                    setActiveView(pendingTargetView);
+                    setPendingTargetView(null);
+                  }
+                }}
+                className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-black py-3.5 rounded-2xl transition-all active:scale-95 text-sm"
+              >
+                OK
+              </button>
+              <button 
+                onClick={() => {
+                  setShowUnsavedModal(false);
+                  setPendingTargetView(null);
+                  setActiveView('list');
+                }}
+                className="flex-1 bg-primary-green hover:bg-emerald-600 text-white font-black py-3.5 rounded-2xl shadow-lg active:scale-95 transition-all text-sm flex items-center justify-center gap-1.5"
+              >
+                <Save size={16} />
+                <span>GUARDAR</span>
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </Layout>
   );
