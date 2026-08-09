@@ -108,97 +108,46 @@ async function fetchCoto(query: string) {
   return [];
 }
 
-async function getCoopeSession() {
-  try {
-    const response = await axios.get("https://www.lacoopeencasa.coop/", {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
-        'Accept-Language': 'es-ES,es;q=0.9',
-      },
-      timeout: 8000
-    });
-    
-    const setCookie = response.headers['set-cookie'];
-    if (setCookie) {
-      // Join all cookies to maintain session context
-      return setCookie.map(c => c.split(';')[0]).join('; ');
-    }
-  } catch (error: any) {
-    logger.error("[Cooperativa Obrera] Error fetching session:", error.message);
-  }
-  return null;
-}
-
 async function fetchCoope(query: string, idLocal: number = 840): Promise<any[]> {
   try {
-    const allCookies = await getCoopeSession();
-    const url = "https://api.lacoopeencasa.coop/api/articulos/pagina_busqueda";
-    
-    // Configuración para el local especificado (ej. 840 para Bahía Blanca)
-    // El sitio usa paginación 0-indexed. El 1 original saltaba la primera página.
-    const formattedQuery = query
-      .toUpperCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replace(/ /g, "_");
+    const url = `https://api.lacoopeencasa.coop/api/buscar/articulos?q=${encodeURIComponent(query)}&offset=0&pedido=0`;
+    const cookieHeader = `_lcec_linf={"id_local":${idLocal}};`;
 
-    const payload = {
-      pagina: 0,
-      filtros: {
-        preciomenor: -1,
-        preciomayor: -1,
-        categoria: [],
-        marca: [],
-        tipo_seleccion: "busqueda",
-        tipo_relacion: "busqueda",
-        filtros_gramaje: [],
-        termino: formattedQuery,
-        cant_articulos: 0,
-        ofertas: false,
-        modificado: true,
-        primer_filtro: ""
-      }
-    };
-
-    // Combinamos las cookies del sitio con la de información de local
-    const cookieHeader = `${allCookies ? allCookies + '; ' : ''}_lcec_linf={"id_local":${idLocal}};`;
-
-    const { data } = await axios.post(url, payload, {
+    const { data } = await axios.get(url, {
       headers: {
-        'Content-Type': 'application/json',
         'Accept': 'application/json, text/plain, */*',
         'Origin': 'https://www.lacoopeencasa.coop',
         'Referer': 'https://www.lacoopeencasa.coop/',
-        'is-mobile': 'true',
-        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
-        'Cookie': cookieHeader,
-        'X-Requested-With': 'XMLHttpRequest'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0',
+        'Cookie': cookieHeader
       },
-      timeout: 15000
+      timeout: 10000
     });
     
-    if (data?.datos?.articulos?.length > 0) {
-      const topProducts = data.datos.articulos.slice(0, 3);
+    if (data?.datos?.length > 0) {
+      const topProducts = data.datos.slice(0, 3);
       return topProducts.map((p: any) => {
-        const slug = p.descripcion
+        const slug = (p.descripcion || '')
           .toLowerCase()
           .trim()
           .replace(/[^\w\s-]/g, "")
           .replace(/[\s_-]+/g, "-")
           .replace(/^-+|-+$/g, "");
 
+        const price = parseFloat(p.precio) || 0;
+        const originalPrice = parseFloat(p.precio_anterior) || price;
+
         return {
           id: "lacoope",
           name: "Cooperativa Obrera",
-          price: parseFloat(p.precio) || 0,
-          inStock: parseFloat(p.stock) > 0,
+          price: price,
+          inStock: p.estado === "1" && price > 0,
           url: `https://www.lacoopeencasa.coop/producto/${slug}/${p.cod_interno}`,
-          originalPrice: parseFloat(p.precio_anterior) || parseFloat(p.precio) || 0,
-          isOffer: parseFloat(p.precio_anterior) > parseFloat(p.precio),
+          originalPrice: originalPrice,
+          isOffer: originalPrice > price,
           imageUrl: p.imagen || '',
           productName: p.descripcion || 'Producto en La Coope',
-          brand: p.marca_desc || p.marca || ''
+          brand: p.marca_desc || ''
         };
       });
     }
@@ -208,8 +157,9 @@ async function fetchCoope(query: string, idLocal: number = 840): Promise<any[]> 
       logger.error("[Cooperativa Obrera] Response data:", JSON.stringify(error.response.data));
     }
   }
-  return [{ id: "lacoope", name: "Cooperativa Obrera", price: 0, inStock: false, url: '', originalPrice: 0, isOffer: false, imageUrl: '', productName: 'Producto no disponible', brand: '' }];
+  return [];
 }
+
 
 const CITY_CHAINS: Record<string, string[]> = {
   "default": ["carrefour", "masonline", "vea", "lacoope", "dia", "coto"],

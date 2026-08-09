@@ -7,154 +7,136 @@ const axios_1 = require("axios");
 const cors = require("cors");
 // Initialize CORS
 const corsHandler = cors({ origin: true });
-async function fetchVtex(storeName, domain, query) {
-    var _a;
+async function fetchVtex(storeName, domain, query, sc = 1) {
     try {
-        const url = `https://${domain}/api/catalog_system/pub/products/search?ft=${encodeURIComponent(query)}`;
-        const { data } = await axios_1.default.get(url, {
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-            },
-            timeout: 10000
-        });
-        if (data && data.length > 0) {
-            const results = [];
-            const topProducts = data.slice(0, 3); // top 3
-            for (const product of topProducts) {
-                const item = product.items && product.items.length > 0 ? product.items[0] : null;
+        const searchUrl = `https://${domain}/api/catalog_system/pub/products/search?ft=${encodeURIComponent(query)}&sc=${sc}`;
+        // Generar cookie de segmento idéntica a la del navegador para activar promociones
+        const segmentObj = {
+            campaigns: null,
+            channel: sc.toString(),
+            priceTables: null,
+            regionId: null,
+            utm_campaign: null,
+            utm_source: null,
+            utmi_campaign: null,
+            currencyCode: "ARS",
+            currencySymbol: "$",
+            countryCode: "ARG",
+            cultureInfo: "es-AR",
+            channelPrivacy: "public"
+        };
+        const segmentBase64 = Buffer.from(JSON.stringify(segmentObj)).toString("base64");
+        const cookie = `vtex_segment=${segmentBase64}; checkout.vtex.com=__ofid=`; // __ofid ayuda a resetear sesión si es necesario
+        const commonHeaders = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'application/json',
+            'Cookie': cookie,
+            'x-vtex-sc': sc.toString()
+        };
+        const { data: searchData } = await axios_1.default.get(searchUrl, { headers: commonHeaders, timeout: 8000 });
+        logger.info(`[${storeName}] Search results found: ${(searchData === null || searchData === void 0 ? void 0 : searchData.length) || 0}`);
+        if (searchData && searchData.length > 0) {
+            const topProducts = searchData.slice(0, 3);
+            const skusToSimulate = [];
+            // Mapeo inicial desde la búsqueda (con descuentos ya aplicados en Search API si sc=34 funciona)
+            const results = topProducts.map((product) => {
+                var _a, _b, _c, _d, _e;
+                const item = (_a = product.items) === null || _a === void 0 ? void 0 : _a[0];
                 if (item) {
-                    const commertialOffer = (_a = item.sellers[0]) === null || _a === void 0 ? void 0 : _a.commertialOffer;
-                    const price = (commertialOffer === null || commertialOffer === void 0 ? void 0 : commertialOffer.Price) || 0;
-                    let listPrice = (commertialOffer === null || commertialOffer === void 0 ? void 0 : commertialOffer.ListPrice) || 0;
-                    if (listPrice > price * 3 && price > 0) {
-                        listPrice = price;
-                    }
-                    const stock = (commertialOffer === null || commertialOffer === void 0 ? void 0 : commertialOffer.AvailableQuantity) || 0;
-                    const isOffer = listPrice > price;
-                    const imageUrl = item.images && item.images.length > 0 ? item.images[0].imageUrl : '';
-                    results.push({
+                    const offer = (_c = (_b = item.sellers) === null || _b === void 0 ? void 0 : _b[0]) === null || _c === void 0 ? void 0 : _c.commertialOffer;
+                    skusToSimulate.push({ id: item.itemId, quantity: 1, seller: "1" });
+                    const searchPrice = (offer === null || offer === void 0 ? void 0 : offer.SpotPrice) || (offer === null || offer === void 0 ? void 0 : offer.Price) || 0;
+                    const searchListPrice = (offer === null || offer === void 0 ? void 0 : offer.ListPrice) || searchPrice;
+                    return {
                         id: domain.replace('www.', '').replace('.com.ar', '').replace('.com', ''),
                         name: storeName,
-                        price,
-                        inStock: stock > 0,
-                        url: product.link || `https://${domain}/${product.linkText}/p`,
-                        originalPrice: listPrice,
-                        isOffer,
-                        imageUrl,
+                        skuId: item.itemId,
                         productName: product.productName,
-                        brand: product.brand || ''
-                    });
+                        url: product.link || `https://${domain}/${product.linkText}/p`,
+                        imageUrl: ((_e = (_d = item.images) === null || _d === void 0 ? void 0 : _d[0]) === null || _e === void 0 ? void 0 : _e.imageUrl) || '',
+                        brand: product.brand || '',
+                        price: searchPrice,
+                        originalPrice: searchListPrice,
+                        isOffer: searchListPrice > searchPrice,
+                        inStock: (offer === null || offer === void 0 ? void 0 : offer.AvailableQuantity) > 0
+                    };
+                }
+                return null;
+            }).filter((r) => r !== null);
+            // Opcional: Checkout Simulation para confirmar precios finales y detectar beneficios complejos (2x1, etc)
+            if (skusToSimulate.length > 0) {
+                try {
+                    const simUrl = `https://${domain}/api/checkout/pub/orderforms/simulation?sc=${sc}`;
+                    const { data: simData } = await axios_1.default.post(simUrl, { items: skusToSimulate }, { headers: commonHeaders, timeout: 5000 });
+                    if (simData && simData.items) {
+                        simData.items.forEach((simItem, idx) => {
+                            if (results[idx]) {
+                                const simPrice = simItem.sellingPrice / 100;
+                                const simListPrice = (simItem.listPrice || simItem.sellingPrice) / 100;
+                                // Si la simulación da un precio menor, lo usamos (ej: descuentos por cantidad)
+                                if (simPrice > 0 && simPrice < results[idx].price) {
+                                    results[idx].price = simPrice;
+                                    results[idx].originalPrice = simListPrice;
+                                    results[idx].isOffer = simListPrice > simPrice;
+                                }
+                            }
+                        });
+                    }
+                }
+                catch (simError) {
+                    logger.warn(`[${storeName}] Simulation failed, using search results.`, simError.message);
                 }
             }
-            return results;
+            return results.filter((r) => r.price > 0);
         }
     }
     catch (error) {
         logger.error(`[${storeName}] Error on VTEX API:`, error.message);
     }
-    return [{
-            id: domain.replace('www.', '').replace('.com.ar', '').replace('.com', ''),
-            name: storeName,
-            price: 0,
-            inStock: false,
-            url: '',
-            originalPrice: 0,
-            isOffer: false,
-            imageUrl: '',
-            productName: 'Producto no disponible',
-            brand: ''
-        }];
+    return [];
 }
 async function fetchCoto(query) {
     // Coto no es VTEX, requiere scraping o una API específica.
     // Por ahora devolvemos un placeholder vacío para evitar errores.
     return [];
 }
-async function getCoopeSession() {
+async function fetchCoope(query, idLocal = 840) {
+    var _a;
     try {
-        const response = await axios_1.default.get("https://www.lacoopeencasa.coop/", {
+        const url = `https://api.lacoopeencasa.coop/api/buscar/articulos?q=${encodeURIComponent(query)}&offset=0&pedido=0`;
+        const cookieHeader = `_lcec_linf={"id_local":${idLocal}};`;
+        const { data } = await axios_1.default.get(url, {
             headers: {
-                'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
-                'Accept-Language': 'es-ES,es;q=0.9',
-            },
-            timeout: 8000
-        });
-        const setCookie = response.headers['set-cookie'];
-        if (setCookie) {
-            // Join all cookies to maintain session context
-            return setCookie.map(c => c.split(';')[0]).join('; ');
-        }
-    }
-    catch (error) {
-        logger.error("[Cooperativa Obrera] Error fetching session:", error.message);
-    }
-    return null;
-}
-async function fetchCoope(query) {
-    var _a, _b;
-    try {
-        const allCookies = await getCoopeSession();
-        const url = "https://api.lacoopeencasa.coop/api/articulos/pagina_busqueda";
-        // Configuración para Bahía Blanca (id_local: 840)
-        // El sitio usa paginación 0-indexed. El 1 original saltaba la primera página.
-        const formattedQuery = query
-            .toUpperCase()
-            .normalize("NFD")
-            .replace(/[\u0300-\u036f]/g, "")
-            .replace(/ /g, "_");
-        const payload = {
-            pagina: 0,
-            filtros: {
-                preciomenor: -1,
-                preciomayor: -1,
-                categoria: [],
-                marca: [],
-                tipo_seleccion: "busqueda",
-                tipo_relacion: "busqueda",
-                filtros_gramaje: [],
-                termino: formattedQuery,
-                cant_articulos: 0,
-                ofertas: false,
-                modificado: true,
-                primer_filtro: ""
-            }
-        };
-        // Combinamos las cookies del sitio con la de información de local
-        const cookieHeader = `${allCookies ? allCookies + '; ' : ''}_lcec_linf={"id_local":840};`;
-        const { data } = await axios_1.default.post(url, payload, {
-            headers: {
-                'Content-Type': 'application/json',
                 'Accept': 'application/json, text/plain, */*',
                 'Origin': 'https://www.lacoopeencasa.coop',
                 'Referer': 'https://www.lacoopeencasa.coop/',
-                'is-mobile': 'true',
-                'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
-                'Cookie': cookieHeader,
-                'X-Requested-With': 'XMLHttpRequest'
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0',
+                'Cookie': cookieHeader
             },
-            timeout: 15000
+            timeout: 10000
         });
-        if (((_b = (_a = data === null || data === void 0 ? void 0 : data.datos) === null || _a === void 0 ? void 0 : _a.articulos) === null || _b === void 0 ? void 0 : _b.length) > 0) {
-            const topProducts = data.datos.articulos.slice(0, 3);
+        if (((_a = data === null || data === void 0 ? void 0 : data.datos) === null || _a === void 0 ? void 0 : _a.length) > 0) {
+            const topProducts = data.datos.slice(0, 3);
             return topProducts.map((p) => {
-                const slug = p.descripcion
+                const slug = (p.descripcion || '')
                     .toLowerCase()
                     .trim()
                     .replace(/[^\w\s-]/g, "")
                     .replace(/[\s_-]+/g, "-")
                     .replace(/^-+|-+$/g, "");
+                const price = parseFloat(p.precio) || 0;
+                const originalPrice = parseFloat(p.precio_anterior) || price;
                 return {
                     id: "lacoope",
                     name: "Cooperativa Obrera",
-                    price: parseFloat(p.precio) || 0,
-                    inStock: parseFloat(p.stock) > 0,
+                    price: price,
+                    inStock: p.estado === "1" && price > 0,
                     url: `https://www.lacoopeencasa.coop/producto/${slug}/${p.cod_interno}`,
-                    originalPrice: parseFloat(p.precio_anterior) || parseFloat(p.precio) || 0,
-                    isOffer: parseFloat(p.precio_anterior) > parseFloat(p.precio),
+                    originalPrice: originalPrice,
+                    isOffer: originalPrice > price,
                     imageUrl: p.imagen || '',
                     productName: p.descripcion || 'Producto en La Coope',
-                    brand: p.marca_desc || p.marca || ''
+                    brand: p.marca_desc || ''
                 };
             });
         }
@@ -165,28 +147,43 @@ async function fetchCoope(query) {
             logger.error("[Cooperativa Obrera] Response data:", JSON.stringify(error.response.data));
         }
     }
-    return [{ id: "lacoope", name: "Cooperativa Obrera", price: 0, inStock: false, url: '', originalPrice: 0, isOffer: false, imageUrl: '', productName: 'Producto no disponible', brand: '' }];
+    return [];
 }
 const CITY_CHAINS = {
     "default": ["carrefour", "masonline", "vea", "lacoope", "dia", "coto"],
-    "bahia blanca": ["carrefour", "masonline", "vea", "lacoope", "dia", "coto"],
-    "mar del plata": ["carrefour", "masonline", "vea", "dia", "coto", "disco", "toledo"],
+    "bahia blanca": ["carrefour", "masonline", "vea", "lacoope"],
+    "mar del plata": ["carrefour", "masonline", "vea", "dia", "coto", "disco", "toledo", "lacoope"],
     "rosario": ["carrefour", "masonline", "vea", "dia", "coto", "disco"],
     "caba": ["carrefour", "masonline", "vea", "lacoope", "dia", "coto", "disco"],
     "neuquen": ["carrefour", "laanonima", "vea", "lacoope", "dia"],
     "bariloche": ["carrefour", "laanonima", "todo", "vea"]
 };
+// Mapeo de ciudades a IDs de sucursales de La Coope
+const COOPE_LOCAL_IDS = {
+    "default": 840,
+    "bahia blanca": 840,
+    "neuquen": 748,
+    "mar del plata": 815,
+    "general roca": 757,
+    "viedma": 732,
+    "punta alta": 841,
+    "caba": 840
+};
 exports.getSupermarketPrices = (0, https_1.onRequest)({ timeoutSeconds: 60, memory: "256MiB" }, (req, res) => {
     corsHandler(req, res, async () => {
         const q = (req.query.query || req.query.barcode);
         const rawCity = (req.query.city || "");
-        const city = rawCity.toLowerCase().trim()
+        let city = rawCity.toLowerCase().trim()
             .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // Quitar acentos
             .replace(/, .+$/, ""); // Quitar sufijos como ", Provincia de..."
+        // Mapeo de alias para Bahía Blanca
+        if (city === "b. blanca" || city === "bb" || city === "b blanca") {
+            city = "bahia blanca";
+        }
         logger.info(`Buscando [${q}] en [${rawCity}] -> Normalizada: [${city}]`);
         // Determinar qué cadenas buscar basándonos en la ciudad
         let allowedChains = CITY_CHAINS[city] || CITY_CHAINS["default"];
-        // Fallback para variaciones comunes
+        // Fallback para variaciones comunes si no hubo coincidencia exacta
         if (!CITY_CHAINS[city]) {
             if (city.includes("bahia blanca"))
                 allowedChains = CITY_CHAINS["bahia blanca"];
@@ -199,21 +196,23 @@ exports.getSupermarketPrices = (0, https_1.onRequest)({ timeoutSeconds: 60, memo
         try {
             const fetchers = [];
             if (allowedChains.includes("carrefour"))
-                fetchers.push(fetchVtex("Carrefour", "www.carrefour.com.ar", q));
+                fetchers.push(fetchVtex("Carrefour", "www.carrefour.com.ar", q, 3));
             if (allowedChains.includes("masonline"))
-                fetchers.push(fetchVtex("Chango Más", "www.masonline.com.ar", q));
+                fetchers.push(fetchVtex("Chango Más", "www.masonline.com.ar", q, 1));
             if (allowedChains.includes("vea"))
-                fetchers.push(fetchVtex("VEA", "www.vea.com.ar", q));
-            if (allowedChains.includes("lacoope"))
-                fetchers.push(fetchCoope(q));
+                fetchers.push(fetchVtex("VEA", "www.vea.com.ar", q, 34));
+            if (allowedChains.includes("lacoope")) {
+                const idLocal = COOPE_LOCAL_IDS[city] || COOPE_LOCAL_IDS["default"];
+                fetchers.push(fetchCoope(q, idLocal));
+            }
             if (allowedChains.includes("dia"))
-                fetchers.push(fetchVtex("Día", "diaonline.supermercadosdia.com.ar", q));
+                fetchers.push(fetchVtex("Día", "diaonline.supermercadosdia.com.ar", q, 1));
             if (allowedChains.includes("disco"))
-                fetchers.push(fetchVtex("Disco", "www.disco.com.ar", q));
+                fetchers.push(fetchVtex("Disco", "www.disco.com.ar", q, 34));
             if (allowedChains.includes("toledo"))
-                fetchers.push(fetchVtex("Toledo", "www.toledodigital.com.ar", q));
+                fetchers.push(fetchVtex("Toledo", "www.toledodigital.com.ar", q, 1));
             if (allowedChains.includes("laanonima"))
-                fetchers.push(fetchVtex("La Anónima", "www.laanonima.com.ar", q));
+                fetchers.push(fetchVtex("La Anónima", "www.laanonima.com.ar", q, 1));
             // Coto es especial (pendiente implementación robusta, por ahora simulamos si está permitido)
             if (allowedChains.includes("coto"))
                 fetchers.push(fetchCoto(q));
