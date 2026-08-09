@@ -51,7 +51,33 @@ export interface LocationData {
   zipCode: string;
 }
 
+interface CacheEntry<T> {
+  data: T;
+  timestamp: number;
+}
+
+const MEMORY_CACHE = new Map<string, CacheEntry<any>>();
+const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutos
+
+function getCached<T>(key: string): T | null {
+  const entry = MEMORY_CACHE.get(key);
+  if (entry && (Date.now() - entry.timestamp) < CACHE_TTL_MS) {
+    return entry.data as T;
+  }
+  return null;
+}
+
+function setCache<T>(key: string, data: T): void {
+  MEMORY_CACHE.set(key, { data, timestamp: Date.now() });
+}
+
 export async function getSupermarketPrices(query: string, location?: LocationData): Promise<SupermarketPrice[]> {
+  const cacheKey = `prices-${query.trim().toLowerCase()}-${location?.city || 'default'}`;
+  const cachedData = getCached<SupermarketPrice[]>(cacheKey);
+  if (cachedData) {
+    return cachedData;
+  }
+
   try {
     let url = `https://getsupermarketprices-4glajx37za-uc.a.run.app?query=${encodeURIComponent(query)}`;
     if (location) {
@@ -105,11 +131,14 @@ export async function getSupermarketPrices(query: string, location?: LocationDat
 
     // Ordenar: primero los que tienen stock y precio > 0, de más barato a más caro.
     // Los que no tienen stock o precio 0 van al final.
-    return validPrices.sort((a, b) => {
+    const finalPrices = validPrices.sort((a, b) => {
       if (a.inStock && a.price > 0 && (!b.inStock || b.price === 0)) return -1;
       if (b.inStock && b.price > 0 && (!a.inStock || a.price === 0)) return 1;
       return a.price - b.price;
     });
+
+    setCache(cacheKey, finalPrices);
+    return finalPrices;
   } catch (error: any) {
     console.error("Error fetching real prices from Firebase/CloudRun:", error);
     if (error.name === 'TypeError' && error.message === 'Failed to fetch') {

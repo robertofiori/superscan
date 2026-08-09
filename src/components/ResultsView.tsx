@@ -153,8 +153,20 @@ const ProductCard: React.FC<{
 const ResultsView: React.FC<ResultsViewProps> = ({ product, prices, onAddToList, onBack }) => {
   const [sortBy, setSortBy] = useState<SortOption>('price');
   const [showOnlyOffers, setShowOnlyOffers] = useState(false);
+  const [selectedBrand, setSelectedBrand] = useState<string>('all');
 
   const queryName = product.product_name?.replace('Búsqueda: ', '') || 'Producto';
+
+  // Extraer marcas únicas
+  const availableBrands = useMemo(() => {
+    const brandsSet = new Set<string>();
+    prices.forEach(p => {
+      if (p.brand && p.brand.trim().length > 1) {
+        brandsSet.add(p.brand.trim());
+      }
+    });
+    return Array.from(brandsSet);
+  }, [prices]);
 
   const processedPrices = useMemo(() => {
     // Robust check for DIA chain matches api.ts
@@ -169,6 +181,11 @@ const ResultsView: React.FC<ResultsViewProps> = ({ product, prices, onAddToList,
     // Filter by offers if enabled
     if (showOnlyOffers) {
       result = result.filter(p => p.isOffer);
+    }
+
+    // Filter by brand if selected
+    if (selectedBrand !== 'all') {
+      result = result.filter(p => p.brand?.toLowerCase() === selectedBrand.toLowerCase());
     }
 
     // Sort logic
@@ -189,19 +206,19 @@ const ResultsView: React.FC<ResultsViewProps> = ({ product, prices, onAddToList,
     });
 
     return result;
-  }, [prices, sortBy, showOnlyOffers]);
+  }, [prices, sortBy, showOnlyOffers, selectedBrand]);
 
   return (
     <div className="flex flex-col gap-4 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-24">
       {/* Header section */}
-      <div className="px-1">
+      <div className="px-1 flex items-center justify-between">
         <h2 className="text-2xl font-black text-slate-800 leading-tight">
           Resultados para <span className="text-primary-green">"{queryName}"</span>
         </h2>
       </div>
 
       {/* Control Bar - Mobile Optimized */}
-      <div className="flex flex-col gap-3 sticky top-0 z-40 bg-slate-50/80 backdrop-blur-md py-2 -mx-4 px-4 border-b border-slate-200/50">
+      <div className="flex flex-col gap-3 sticky top-0 z-40 bg-slate-50/90 backdrop-blur-md py-2 -mx-4 px-4 border-b border-slate-200/50">
         <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
           {/* Sort Segmented Control */}
           <div className="flex bg-slate-100 p-1 rounded-xl shrink-0">
@@ -241,6 +258,36 @@ const ResultsView: React.FC<ResultsViewProps> = ({ product, prices, onAddToList,
             <Zap size={14} className={showOnlyOffers ? 'fill-current' : ''} />
             SÓLO OFERTAS
           </button>
+
+          {/* Brand Filter Chips */}
+          {availableBrands.length > 0 && (
+            <>
+              <div className="h-8 w-[1px] bg-slate-200 shrink-0 mx-1" />
+              <button
+                onClick={() => setSelectedBrand('all')}
+                className={`px-4 py-2.5 rounded-xl font-bold text-xs whitespace-nowrap transition-all border ${
+                  selectedBrand === 'all'
+                  ? 'bg-slate-900 text-white border-slate-900'
+                  : 'bg-white text-slate-600 border-slate-200'
+                }`}
+              >
+                Todas las Marcas
+              </button>
+              {availableBrands.map(b => (
+                <button
+                  key={b}
+                  onClick={() => setSelectedBrand(selectedBrand === b ? 'all' : b)}
+                  className={`px-4 py-2.5 rounded-xl font-bold text-xs whitespace-nowrap transition-all border ${
+                    selectedBrand === b
+                    ? 'bg-primary-green text-white border-primary-green'
+                    : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                  }`}
+                >
+                  {b}
+                </button>
+              ))}
+            </>
+          )}
         </div>
       </div>
 

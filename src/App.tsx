@@ -1,17 +1,25 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import Layout from './components/Layout';
 import HomeView from './components/HomeView';
 import ResultsView from './components/ResultsView';
 import ListView from './components/ListView';
-import ProfileView from './components/ProfileView';
-import Scanner from './components/Scanner';
-import OffersView from './components/OffersView';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { fetchProductInfo, getSupermarketPrices, type ProductData, type SupermarketPrice, type ShoppingListItem } from './api';
 import { AlertCircle, RefreshCw } from 'lucide-react';
 import { LandingScreen, LoginScreen } from './components/AuthScreens';
 import { saveUserList, subscribeToList, saveNamedList, updateNamedList, deleteNamedList, renameNamedList, type SavedList } from './services/listService';
 import React from 'react';
+
+const ProfileView = lazy(() => import('./components/ProfileView'));
+const Scanner = lazy(() => import('./components/Scanner'));
+const OffersView = lazy(() => import('./components/OffersView'));
+
+const ViewFallback = () => (
+  <div className="flex flex-col items-center justify-center min-h-[50vh] p-8 text-center animate-in fade-in duration-300">
+    <div className="w-12 h-12 border-4 border-slate-200 border-t-primary-green rounded-full animate-spin mb-4" />
+    <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Cargando...</span>
+  </div>
+);
 
 // Simple Error Boundary to catch rendering crashes
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean, error: Error | null }> {
@@ -412,10 +420,12 @@ const AppContent = () => {
       onRemoveItem={handleRemoveFromList}
       onClearList={handleClearList}
     >
-      {renderView()}
-      {scanning && (
-        <Scanner onClose={() => setScanning(false)} onScanSuccess={handleScanSuccess} />
-      )}
+      <Suspense fallback={<ViewFallback />}>
+        {renderView()}
+        {scanning && (
+          <Scanner onClose={() => setScanning(false)} onScanSuccess={handleScanSuccess} />
+        )}
+      </Suspense>
     </Layout>
   );
 };

@@ -2,7 +2,7 @@ import React from 'react';
 import { 
   ShoppingBasket, Trash2, Plus, Minus, Share2, 
   ExternalLink, Download, Sparkles, 
-  TrendingDown, Store, Save, Bookmark, Edit2, X, ChevronRight, RefreshCw
+  TrendingDown, Store, Save, Bookmark, Edit2, X, ChevronRight, RefreshCw, CheckCircle2, Circle, ShoppingCart
 } from 'lucide-react';
 import { type ShoppingListItem, type SupermarketPrice } from '../api';
 import { useAuth } from '../contexts/AuthContext';
@@ -49,6 +49,17 @@ const ListView: React.FC<ListViewProps> = ({
   const [editName, setEditName] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [checkedItems, setCheckedItems] = useState<Set<string>>(new Set());
+  const [isChanguitoMode, setIsChanguitoMode] = useState(false);
+
+  const toggleCheckItem = (itemId: string) => {
+    setCheckedItems(prev => {
+      const next = new Set(prev);
+      if (next.has(itemId)) next.delete(itemId);
+      else next.add(itemId);
+      return next;
+    });
+  };
 
   const activeSavedList = savedLists.find(l => l.id === activeSavedListId);
 
@@ -316,6 +327,31 @@ const ListView: React.FC<ListViewProps> = ({
             </div>
           </div>
 
+          {/* Barra Modo Changuito */}
+          <div className="flex items-center justify-between bg-white p-4 rounded-2xl border border-slate-100 shadow-sm my-2">
+            <div className="flex items-center gap-3">
+              <div className={`p-2.5 rounded-xl ${isChanguitoMode ? 'bg-primary-green text-white shadow-md' : 'bg-slate-100 text-slate-500'}`}>
+                <ShoppingCart size={20} />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-xs font-black text-slate-800 uppercase tracking-tight">Modo Changuito 🛒</span>
+                <span className="text-[11px] text-slate-400 font-bold">
+                  {isChanguitoMode ? `${checkedItems.size} de ${items.length} productos listos en tu changuito` : 'Tachá los productos mientras compras'}
+                </span>
+              </div>
+            </div>
+            <button 
+              onClick={() => setIsChanguitoMode(!isChanguitoMode)}
+              className={`px-4 py-2.5 rounded-xl font-black text-xs transition-all ${
+                isChanguitoMode 
+                ? 'bg-primary-green text-white shadow-md scale-105' 
+                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+              }`}
+            >
+              {isChanguitoMode ? 'ACTIVADO ✓' : 'ACTIVAR'}
+            </button>
+          </div>
+
           {/* Listado agrupado */}
           <div className="flex flex-col gap-8">
             {Object.entries(grouped).map(([store, storeItems]) => (
@@ -324,6 +360,7 @@ const ListView: React.FC<ListViewProps> = ({
                   {store}
                 </h3>
                 {storeItems.map((item, idx) => {
+                  const isChecked = checkedItems.has(item.id);
                   const betterPrice = (item.allPrices || [])
                     .filter(p => p.inStock && p.price > 0)
                     .sort((a, b) => {
@@ -346,7 +383,28 @@ const ListView: React.FC<ListViewProps> = ({
                   const isBetter = betterPrice && effectiveBetter < effectiveNow;
 
                   return (
-                    <div key={idx} className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 flex gap-4 items-center relative">
+                    <div 
+                      key={idx} 
+                      onClick={() => {
+                        if (isChanguitoMode) toggleCheckItem(item.id);
+                      }}
+                      className={`bg-white rounded-2xl p-4 shadow-sm border flex gap-4 items-center relative transition-all ${
+                        isChanguitoMode ? 'cursor-pointer select-none' : ''
+                      } ${
+                        isChecked ? 'bg-slate-50 border-emerald-200/60 opacity-60' : 'border-slate-100'
+                      }`}
+                    >
+                      {/* Checkbox en Modo Changuito */}
+                      {isChanguitoMode && (
+                        <div className="shrink-0">
+                          {isChecked ? (
+                            <CheckCircle2 size={24} className="text-primary-green fill-primary-green/10" />
+                          ) : (
+                            <Circle size={24} className="text-slate-300" />
+                          )}
+                        </div>
+                      )}
+
                       <div className="w-12 h-12 shrink-0 bg-white rounded-xl overflow-hidden p-2 flex items-center justify-center relative group">
                           <img src={item.price.imageUrl} alt={item.price.productName} className="w-full h-full object-contain" />
                           {item.price.url && (
@@ -361,7 +419,9 @@ const ListView: React.FC<ListViewProps> = ({
                           )}
                       </div>
                       <div className="flex flex-col flex-1 min-w-0">
-                        <h4 className="font-bold text-slate-800 text-sm line-clamp-1 leading-tight flex items-center gap-1">
+                        <h4 className={`font-bold text-sm line-clamp-1 leading-tight flex items-center gap-1 ${
+                          isChecked ? 'line-through text-slate-400' : 'text-slate-800'
+                        }`}>
                           {item.price.productName || item.product.product_name}
                         </h4>
                         <div className="flex items-center justify-between">
