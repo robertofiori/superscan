@@ -1,5 +1,5 @@
-import React from 'react';
-import { Search, Tag, User, ListOrdered, Barcode } from 'lucide-react';
+import React, { useState } from 'react';
+import { Search, Tag, User, ListOrdered, Barcode, Sparkles } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import LocationModal from './LocationModal';
 import { type ShoppingListItem } from '../api';
@@ -24,7 +24,6 @@ const Layout: React.FC<LayoutProps> = ({
   activeView, 
   onViewChange, 
   cartCount, 
-  onScan, 
   showLocationModal, 
   onCloseLocation,
   listItems = [],
@@ -33,9 +32,23 @@ const Layout: React.FC<LayoutProps> = ({
 }) => {
   const { user, userData } = useAuth();
   const avatarUrl = userData?.avatarUrl || user?.photoURL;
+  const [showSoonToast, setShowSoonToast] = useState(false);
+
+  const handleScanClick = () => {
+    setShowSoonToast(true);
+    setTimeout(() => setShowSoonToast(false), 3000);
+  };
   
   return (
-    <div className="min-h-screen flex flex-col bg-background-soft text-text-dark font-sans">
+    <div className="min-h-screen flex flex-col bg-background-soft text-text-dark font-sans relative">
+      {/* Toast de Notificación MUY PRONTO */}
+      {showSoonToast && (
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[200] bg-amber-500 text-white font-black px-6 py-3 rounded-full shadow-2xl flex items-center gap-2 text-sm animate-in slide-in-from-top-4 duration-300 border-2 border-white">
+          <Sparkles size={18} />
+          <span>¡MUY PRONTO! La función de escanear estará disponible próximamente.</span>
+        </div>
+      )}
+
       {/* Top Navigation (Desktop Only) - Mobile Adaption */}
       <div className="hidden lg:flex fixed top-8 left-1/2 -translate-x-1/2 z-50">
         <nav className="w-[520px] h-18 bg-white/95 backdrop-blur-xl border border-slate-100 shadow-2xl flex items-center justify-around px-2 rounded-[32px]">
@@ -90,10 +103,17 @@ const Layout: React.FC<LayoutProps> = ({
           />
 
           <NavItem
-            icon={<Barcode size={24} />}
+            icon={
+              <div className="relative flex flex-col items-center justify-center">
+                <span className="absolute -top-3 bg-amber-500 text-white text-[7px] font-black px-1.5 py-0.5 rounded-full shadow-sm tracking-wider uppercase whitespace-nowrap border border-white">
+                  MUY PRONTO
+                </span>
+                <Barcode size={24} className="opacity-50" />
+              </div>
+            }
             label="Escanear"
             isActive={false}
-            onClick={onScan}
+            onClick={handleScanClick}
           />
         </nav>
       </div>
@@ -172,10 +192,17 @@ const Layout: React.FC<LayoutProps> = ({
           />
 
           <NavItem
-            icon={<Barcode size={24} />}
+            icon={
+              <div className="relative flex flex-col items-center justify-center">
+                <span className="absolute -top-3 bg-amber-500 text-white text-[7px] font-black px-1.5 py-0.5 rounded-full shadow-sm tracking-wider uppercase whitespace-nowrap border border-white">
+                  MUY PRONTO
+                </span>
+                <Barcode size={24} className="opacity-50" />
+              </div>
+            }
             label="Escanear"
             isActive={false}
-            onClick={onScan}
+            onClick={handleScanClick}
           />
       </nav>
     </div>
