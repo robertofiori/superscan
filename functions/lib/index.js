@@ -7,6 +7,44 @@ const axios_1 = require("axios");
 const cors = require("cors");
 // Initialize CORS
 const corsHandler = cors({ origin: true });
+function scoreProduct(productName, query) {
+    if (!productName)
+        return 0;
+    const pName = productName.toLowerCase();
+    const q = query.toLowerCase().trim();
+    let score = 0;
+    const words = pName.split(/[\s,.-]+/);
+    if (words[0] === q)
+        score += 100;
+    else if (words.includes(q))
+        score += 50;
+    else if (pName.includes(q))
+        score += 20;
+    // Penalizar falsos positivos comunes cuando se busca un ingrediente básico
+    if (q === 'leche') {
+        if (pName.includes('dulce de leche'))
+            score -= 40;
+        if (pName.includes('espumador'))
+            score -= 80;
+        if (pName.includes('galleta') || pName.includes('pepitas'))
+            score -= 40;
+        if (pName.includes('yogur'))
+            score -= 30;
+        if (pName.includes('licor'))
+            score -= 50;
+    }
+    if (q === 'aceite') {
+        if (pName.includes('freidora'))
+            score -= 80;
+        if (pName.includes('difusor') || pName.includes('bomba'))
+            score -= 80;
+    }
+    if (q === 'fideos') {
+        if (pName.includes('fabrica') || pName.includes('pastalinda') || pName.includes('maquina'))
+            score -= 80;
+    }
+    return score;
+}
 async function fetchVtex(storeName, domain, query, sc = 1) {
     try {
         const searchUrl = `https://${domain}/api/catalog_system/pub/products/search?ft=${encodeURIComponent(query)}&sc=${sc}`;
@@ -36,7 +74,9 @@ async function fetchVtex(storeName, domain, query, sc = 1) {
         const { data: searchData } = await axios_1.default.get(searchUrl, { headers: commonHeaders, timeout: 8000 });
         logger.info(`[${storeName}] Search results found: ${(searchData === null || searchData === void 0 ? void 0 : searchData.length) || 0}`);
         if (searchData && searchData.length > 0) {
-            const topProducts = searchData.slice(0, 3);
+            // Ordenar por relevancia antes de tomar los primeros productos
+            const sortedData = [...searchData].sort((a, b) => scoreProduct(b.productName || '', query) - scoreProduct(a.productName || '', query));
+            const topProducts = sortedData.slice(0, 3);
             const skusToSimulate = [];
             // Mapeo inicial desde la búsqueda (con descuentos ya aplicados en Search API si sc=34 funciona)
             const results = topProducts.map((product) => {
@@ -196,7 +236,7 @@ exports.getSupermarketPrices = (0, https_1.onRequest)({ timeoutSeconds: 60, memo
         try {
             const fetchers = [];
             if (allowedChains.includes("carrefour"))
-                fetchers.push(fetchVtex("Carrefour", "www.carrefour.com.ar", q, 3));
+                fetchers.push(fetchVtex("Carrefour", "www.carrefour.com.ar", q, 1));
             if (allowedChains.includes("masonline"))
                 fetchers.push(fetchVtex("Chango Más", "www.masonline.com.ar", q, 1));
             if (allowedChains.includes("vea"))

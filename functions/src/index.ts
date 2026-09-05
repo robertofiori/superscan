@@ -6,6 +6,36 @@ import * as cors from "cors";
 // Initialize CORS
 const corsHandler = cors({ origin: true });
 
+function scoreProduct(productName: string, query: string): number {
+  if (!productName) return 0;
+  const pName = productName.toLowerCase();
+  const q = query.toLowerCase().trim();
+  let score = 0;
+
+  const words = pName.split(/[\s,.-]+/);
+  if (words[0] === q) score += 100;
+  else if (words.includes(q)) score += 50;
+  else if (pName.includes(q)) score += 20;
+
+  // Penalizar falsos positivos comunes cuando se busca un ingrediente básico
+  if (q === 'leche') {
+    if (pName.includes('dulce de leche')) score -= 40;
+    if (pName.includes('espumador')) score -= 80;
+    if (pName.includes('galleta') || pName.includes('pepitas')) score -= 40;
+    if (pName.includes('yogur')) score -= 30;
+    if (pName.includes('licor')) score -= 50;
+  }
+  if (q === 'aceite') {
+    if (pName.includes('freidora')) score -= 80;
+    if (pName.includes('difusor') || pName.includes('bomba')) score -= 80;
+  }
+  if (q === 'fideos') {
+    if (pName.includes('fabrica') || pName.includes('pastalinda') || pName.includes('maquina')) score -= 80;
+  }
+
+  return score;
+}
+
 async function fetchVtex(storeName: string, domain: string, query: string, sc: number = 1) {
   try {
     const searchUrl = `https://${domain}/api/catalog_system/pub/products/search?ft=${encodeURIComponent(query)}&sc=${sc}`;
@@ -39,7 +69,11 @@ async function fetchVtex(storeName: string, domain: string, query: string, sc: n
     logger.info(`[${storeName}] Search results found: ${searchData?.length || 0}`);
     
     if (searchData && searchData.length > 0) {
-      const topProducts = searchData.slice(0, 3);
+      // Ordenar por relevancia antes de tomar los primeros productos
+      const sortedData = [...searchData].sort((a: any, b: any) => 
+        scoreProduct(b.productName || '', query) - scoreProduct(a.productName || '', query)
+      );
+      const topProducts = sortedData.slice(0, 3);
       const skusToSimulate: any[] = [];
 
       // Mapeo inicial desde la búsqueda (con descuentos ya aplicados en Search API si sc=34 funciona)
@@ -214,7 +248,7 @@ export const getSupermarketPrices = onRequest({ timeoutSeconds: 60, memory: "256
     try {
       const fetchers: Promise<any[]>[] = [];
       
-      if (allowedChains.includes("carrefour")) fetchers.push(fetchVtex("Carrefour", "www.carrefour.com.ar", q, 3));
+      if (allowedChains.includes("carrefour")) fetchers.push(fetchVtex("Carrefour", "www.carrefour.com.ar", q, 1));
       if (allowedChains.includes("masonline")) fetchers.push(fetchVtex("Chango Más", "www.masonline.com.ar", q, 1));
       if (allowedChains.includes("vea")) fetchers.push(fetchVtex("VEA", "www.vea.com.ar", q, 34));
       
