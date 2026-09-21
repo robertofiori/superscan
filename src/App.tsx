@@ -250,12 +250,13 @@ const AppContent = () => {
     });
   };
 
-  const handleAddToList = (prod: ProductData, best: SupermarketPrice, allPrices: SupermarketPrice[], quantity: number = 1) => {
+  const handleAddToList = (prod: ProductData, best: SupermarketPrice, allPrices: SupermarketPrice[], quantity: number = 1, isOptional: boolean = false) => {
     setListItems(prev => {
-      // Usar EAN o URL para unicidad absoluta del producto-oferta
+      // Usar EAN o URL para unicidad absoluta del producto-oferta y su condición opcional
       const productUniqueId = best.ean || best.url || `${best.productName}-${best.supermarket}`;
       const existingIdx = prev.findIndex(item => 
-        (item.price.ean || item.price.url || `${item.price.productName}-${item.price.supermarket}`) === productUniqueId
+        (item.price.ean || item.price.url || `${item.price.productName}-${item.price.supermarket}`) === productUniqueId &&
+        Boolean(item.isOptional) === isOptional
       );
       
       if (existingIdx >= 0) {
@@ -264,7 +265,8 @@ const AppContent = () => {
           ...neue[existingIdx], 
           quantity: neue[existingIdx].quantity + quantity,
           price: best, 
-          allPrices: allPrices 
+          allPrices: allPrices,
+          isOptional: isOptional
         };
         return neue;
       }
@@ -274,9 +276,14 @@ const AppContent = () => {
         price: best, 
         allPrices: allPrices, 
         quantity: quantity,
-        checked: false
+        checked: false,
+        isOptional: isOptional
       }];
     });
+  };
+
+  const handleToggleOptional = (itemId: string) => {
+    setListItems(prev => prev.map(item => item.id === itemId ? { ...item, isOptional: !item.isOptional } : item));
   };
 
   if (authLoading) {
@@ -379,6 +386,7 @@ const AppContent = () => {
             onRenameNamedList={handleRenameNamedList}
             onLoadNamedList={handleLoadNamedList}
             onUnlinkActiveList={() => setActiveSavedListId(null)}
+            onToggleOptional={handleToggleOptional}
           />
         );
       case 'profile':
@@ -393,6 +401,7 @@ const AppContent = () => {
             onShowLocation={() => setShowLocationModal(true)}
             items={listItems}
             onUpdateQuantity={handleUpdateQuantity}
+            onToggleOptional={handleToggleOptional}
           />
         );
     }
@@ -419,6 +428,7 @@ const AppContent = () => {
       listItems={listItems}
       onRemoveItem={handleRemoveFromList}
       onClearList={handleClearList}
+      onToggleOptional={handleToggleOptional}
     >
       <Suspense fallback={<ViewFallback />}>
         {renderView()}

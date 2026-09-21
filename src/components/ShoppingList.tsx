@@ -1,25 +1,19 @@
 import { ShoppingBag, Minus, Plus, Camera, PiggyBank } from 'lucide-react';
-import { type ProductData, type SupermarketPrice } from '../api';
-
-export interface ShoppingListItem {
-  product: ProductData;
-  price: SupermarketPrice;
-  quantity: number;
-}
+import { type ShoppingListItem } from '../api';
 
 interface ShoppingListProps {
   items: ShoppingListItem[];
   onUpdateQuantity: (index: number, delta: number) => void;
   onStartScan: () => void;
   onGoHome: () => void;
+  onToggleOptional?: (id: string) => void;
 }
 
-export default function ShoppingList({ items, onUpdateQuantity, onStartScan, onGoHome }: ShoppingListProps) {
-  const total = items.reduce((acc, item) => acc + (item.price.price * item.quantity), 0);
+export default function ShoppingList({ items, onUpdateQuantity, onStartScan, onGoHome, onToggleOptional }: ShoppingListProps) {
+  const total = items.reduce((acc, item) => item.isOptional ? acc : acc + (item.price.price * item.quantity), 0);
   
   // Calculate potential savings comparing to the most expensive market for each item
-  // A simple mockup to show "savings options" as requested
-  const estimatedSavings = items.reduce((acc, item) => acc + (item.price.price * 0.15 * item.quantity), 0);
+  const estimatedSavings = items.reduce((acc, item) => item.isOptional ? acc : acc + (item.price.price * 0.15 * item.quantity), 0);
 
   // Agrupar items por supermercado
   const groupedItems = items.reduce((acc, item, index) => {
@@ -61,7 +55,14 @@ export default function ShoppingList({ items, onUpdateQuantity, onStartScan, onG
                 </h3>
                 <div className="space-y-3">
                   {storeItems.map((item) => (
-                    <div key={`${item.product.code}-${item.price.id}`} className="bg-surface-light dark:bg-surface-dark rounded-3xl p-4 shadow-sm border border-slate-100 dark:border-slate-800 flex gap-4">
+                    <div 
+                      key={`${item.product.code}-${item.price.id}`} 
+                      className={`rounded-3xl p-4 shadow-sm border flex gap-4 ${
+                        item.isOptional 
+                          ? 'bg-pink-50 border-pink-300 dark:bg-pink-950/30 dark:border-pink-800' 
+                          : 'bg-surface-light dark:bg-surface-dark border-slate-100 dark:border-slate-800'
+                      }`}
+                    >
                       <div className="w-16 h-16 shrink-0 bg-white rounded-xl border border-slate-100 p-1 flex items-center justify-center overflow-hidden">
                         {item.price.imageUrl || item.product.image_url ? (
                           <img src={item.price.imageUrl || item.product.image_url} alt="" className="w-full h-full object-contain" />
@@ -72,11 +73,32 @@ export default function ShoppingList({ items, onUpdateQuantity, onStartScan, onG
                       
                       <div className="flex-1 flex flex-col justify-between py-1">
                         <div>
-                          <h4 className="font-bold text-slate-800 dark:text-slate-100 text-sm leading-tight line-clamp-2 mb-1">
-                            {item.price.productName || item.product.product_name || 'Producto detectado'}
-                          </h4>
+                          <div className="flex items-center justify-between gap-1 mb-1">
+                            <h4 className="font-bold text-slate-800 dark:text-slate-100 text-sm leading-tight line-clamp-2">
+                              {item.price.productName || item.product.product_name || 'Producto detectado'}
+                            </h4>
+                            {onToggleOptional && (
+                              <button
+                                type="button"
+                                onClick={() => onToggleOptional(item.id)}
+                                className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider transition-all shrink-0 ${
+                                  item.isOptional 
+                                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white' 
+                                    : 'bg-pink-100 hover:bg-pink-200 text-pink-700 border border-pink-300'
+                                }`}
+                              >
+                                {item.isOptional ? 'Principal' : '🌸 Opcional'}
+                              </button>
+                            )}
+                          </div>
                         </div>
-                        <span className="font-black text-primary text-lg">${item.price.price.toLocaleString('es-AR')}</span>
+                        {item.isOptional ? (
+                          <span className="font-black text-pink-600 dark:text-pink-400 text-sm line-through">
+                            ${item.price.price.toLocaleString('es-AR')} (Opcional)
+                          </span>
+                        ) : (
+                          <span className="font-black text-primary text-lg">${item.price.price.toLocaleString('es-AR')}</span>
+                        )}
                       </div>
 
                       <div className="shrink-0 flex flex-col items-center justify-between border-l border-slate-100 dark:border-slate-800 pl-3">

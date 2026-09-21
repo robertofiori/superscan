@@ -17,6 +17,7 @@ interface LayoutProps {
   listItems?: ShoppingListItem[];
   onRemoveItem?: (id: string) => void;
   onClearList?: () => void;
+  onToggleOptional?: (id: string) => void;
 }
 
 const Layout: React.FC<LayoutProps> = ({ 
@@ -28,7 +29,8 @@ const Layout: React.FC<LayoutProps> = ({
   onCloseLocation,
   listItems = [],
   onRemoveItem = () => {},
-  onClearList = () => {}
+  onClearList = () => {},
+  onToggleOptional
 }) => {
   const { user, userData } = useAuth();
   const avatarUrl = userData?.avatarUrl || user?.photoURL;
@@ -133,6 +135,7 @@ const Layout: React.FC<LayoutProps> = ({
             onRemoveItem={onRemoveItem}
             onClearList={onClearList}
             onViewFullList={() => onViewChange('list')}
+            onToggleOptional={onToggleOptional}
           />
         </aside>
       </main>

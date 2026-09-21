@@ -14,6 +14,7 @@ interface HomeViewProps {
   onShowLocation: () => void;
   items: ShoppingListItem[];
   onUpdateQuantity: (itemId: string, delta: number) => void;
+  onToggleOptional?: (itemId: string) => void;
 }
 
 const formatPrice = (price: number) => {
@@ -72,7 +73,7 @@ const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: numbe
   return R * c; 
 };
 
-const HomeView: React.FC<HomeViewProps> = ({ onSearch, onViewChange, onShowLocation, items, onUpdateQuantity }) => {
+const HomeView: React.FC<HomeViewProps> = ({ onSearch, onViewChange, onShowLocation, items, onUpdateQuantity, onToggleOptional }) => {
   const { user, userData } = useAuth();
   const [stores, setStores] = React.useState<any[]>([]);
   const [locationStatus, setLocationStatus] = React.useState<'idle' | 'loading' | 'success' | 'error' | 'no_stores'>('idle');
@@ -411,20 +412,48 @@ const HomeView: React.FC<HomeViewProps> = ({ onSearch, onViewChange, onShowLocat
           <div className="bg-white rounded-[32px] p-6 shadow-sm border border-slate-100 flex flex-col gap-4">
             <div className="space-y-4">
               {items.slice(0, 3).map((item) => (
-                <div key={item.id} className="flex items-center justify-between">
-                  <div className="flex items-center gap-3 flex-1 min-w-0">
-                    <div className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center shrink-0">
-                      <img src={item.price.imageUrl || item.product.image_url} alt={item.product.product_name} className="w-8 h-8 object-contain" />
+                <div 
+                  key={item.id} 
+                  className={`flex flex-col gap-2 p-3 rounded-2xl border transition-all ${
+                    item.isOptional ? 'bg-pink-50/80 border-pink-200' : 'bg-slate-50/50 border-slate-100'
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shrink-0 shadow-xs border border-slate-100">
+                        <img src={item.price.imageUrl || item.product.image_url} alt={item.product.product_name} className="w-7 h-7 object-contain" />
+                      </div>
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-xs font-bold text-slate-800 truncate">{item.product.product_name}</span>
+                        {item.isOptional ? (
+                          <span className="text-[11px] font-black text-pink-600 line-through opacity-80">{formatPrice(item.price.price)}</span>
+                        ) : (
+                          <span className="text-xs font-black text-primary-green">{formatPrice(item.price.price)}</span>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex flex-col min-w-0">
-                      <span className="text-sm font-bold text-slate-800 truncate">{item.product.product_name}</span>
-                      <span className="text-xs font-black text-primary-green">{formatPrice(item.price.price)}</span>
+                    
+                    <div className="flex items-center gap-2">
+                      {onToggleOptional && (
+                        <button
+                          type="button"
+                          onClick={() => onToggleOptional(item.id)}
+                          className={`px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all ${
+                            item.isOptional 
+                              ? 'bg-emerald-600 hover:bg-emerald-700 text-white' 
+                              : 'bg-pink-100 hover:bg-pink-200 text-pink-700 border border-pink-300'
+                          }`}
+                        >
+                          {item.isOptional ? 'Principal' : '🌸 Opcional'}
+                        </button>
+                      )}
+                      
+                      <div className="flex items-center gap-2 bg-white p-1 rounded-xl border border-slate-100 shadow-xs">
+                        <button onClick={() => onUpdateQuantity(item.id, -1)} className="p-1 text-slate-400 hover:text-slate-600"><Minus size={12}/></button>
+                        <span className="text-xs font-black text-slate-900 w-3 text-center">{item.quantity}</span>
+                        <button onClick={() => onUpdateQuantity(item.id, 1)} className="p-1 text-primary-green"><Plus size={12}/></button>
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-3 bg-slate-50 p-1.5 rounded-xl border border-slate-100">
-                    <button onClick={() => onUpdateQuantity(item.id, -1)} className="p-1 text-slate-400"><Minus size={14}/></button>
-                    <span className="text-sm font-black text-slate-900 w-4 text-center">{item.quantity}</span>
-                    <button onClick={() => onUpdateQuantity(item.id, 1)} className="p-1 text-primary-green"><Plus size={14}/></button>
                   </div>
                 </div>
               ))}

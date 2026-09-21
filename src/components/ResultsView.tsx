@@ -6,7 +6,7 @@ import ProductQuantitySelector from './ProductQuantitySelector';
 interface ResultsViewProps {
   product: ProductData;
   prices: SupermarketPrice[];
-  onAddToList: (product: ProductData, bestPrice: SupermarketPrice, allPrices: SupermarketPrice[], quantity: number) => void;
+  onAddToList: (product: ProductData, bestPrice: SupermarketPrice, allPrices: SupermarketPrice[], quantity: number, isOptional?: boolean) => void;
   onBack: () => void;
 }
 
@@ -33,11 +33,11 @@ const ProductCard: React.FC<{
   allProductPrices: SupermarketPrice[];
   originalProduct: ProductData;
   isBestPrice: boolean;
-  onAddToList: (product: ProductData, bestPrice: SupermarketPrice, allPrices: SupermarketPrice[], quantity: number) => void;
+  onAddToList: (product: ProductData, bestPrice: SupermarketPrice, allPrices: SupermarketPrice[], quantity: number, isOptional?: boolean) => void;
   queryName: string;
 }> = ({ productItem, allProductPrices, originalProduct, isBestPrice, onAddToList, queryName }) => {
   const [quantity, setQuantity] = useState(1);
-  const [added, setAdded] = useState(false);
+  const [added, setAdded] = useState<'main' | 'optional' | false>(false);
   const p = productItem;
 
   return (
@@ -104,33 +104,63 @@ const ProductCard: React.FC<{
           <div className="flex flex-col gap-2">
               <ProductQuantitySelector quantity={quantity} onUpdate={setQuantity} />
               
-              <button 
-                  onClick={(e) => {
-                      e.stopPropagation();
-                      if (p.inStock) {
-                        const relevantPrices = allProductPrices.filter(other => {
-                          const sameBrand = other.brand?.toLowerCase() === p.brand?.toLowerCase();
-                          const similarName = other.productName?.toLowerCase().includes(p.productName?.split(' ')[0].toLowerCase() || '');
-                          return sameBrand || similarName;
-                        });
-                        onAddToList(originalProduct, p, relevantPrices, quantity);
-                        setAdded(true);
-                        setTimeout(() => setAdded(false), 2000);
-                        setQuantity(1); // Reset quantity after adding
-                      }
-                  }}
-                  disabled={!p.inStock}
-                  className={`w-full py-4 rounded-2xl flex items-center justify-center gap-2 transition-all shadow-lg font-black text-sm uppercase tracking-widest ${
-                      !p.inStock 
-                      ? 'bg-slate-100 text-slate-300 cursor-not-allowed shadow-none'
-                      : added 
-                      ? 'bg-emerald-500 text-white shadow-emerald-100' 
-                      : 'bg-primary-green hover:bg-green-600 text-white active:scale-[0.98] shadow-green-100'
-                  }`}
-              >
-                  {added ? <CheckCircle2 size={16} /> : null}
-                  {p.inStock ? (added ? '¡Agregado!' : 'Agregar') : 'Sin Stock'}
-              </button>
+              <div className="flex gap-2">
+                <button 
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        if (p.inStock) {
+                          const relevantPrices = allProductPrices.filter(other => {
+                            const sameBrand = other.brand?.toLowerCase() === p.brand?.toLowerCase();
+                            const similarName = other.productName?.toLowerCase().includes(p.productName?.split(' ')[0].toLowerCase() || '');
+                            return sameBrand || similarName;
+                          });
+                          onAddToList(originalProduct, p, relevantPrices, quantity, false);
+                          setAdded('main');
+                          setTimeout(() => setAdded(false), 2000);
+                          setQuantity(1);
+                        }
+                    }}
+                    disabled={!p.inStock}
+                    className={`flex-1 py-3.5 rounded-2xl flex items-center justify-center gap-1.5 transition-all shadow-md font-black text-xs uppercase tracking-wider ${
+                        !p.inStock 
+                        ? 'bg-slate-100 text-slate-300 cursor-not-allowed shadow-none'
+                        : added === 'main' 
+                        ? 'bg-emerald-500 text-white shadow-emerald-100' 
+                        : 'bg-primary-green hover:bg-green-600 text-white active:scale-[0.98] shadow-green-100'
+                    }`}
+                >
+                    {added === 'main' ? <CheckCircle2 size={15} /> : null}
+                    {p.inStock ? (added === 'main' ? '¡Agregado!' : 'Agregar') : 'Sin Stock'}
+                </button>
+
+                <button 
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        if (p.inStock) {
+                          const relevantPrices = allProductPrices.filter(other => {
+                            const sameBrand = other.brand?.toLowerCase() === p.brand?.toLowerCase();
+                            const similarName = other.productName?.toLowerCase().includes(p.productName?.split(' ')[0].toLowerCase() || '');
+                            return sameBrand || similarName;
+                          });
+                          onAddToList(originalProduct, p, relevantPrices, quantity, true);
+                          setAdded('optional');
+                          setTimeout(() => setAdded(false), 2000);
+                          setQuantity(1);
+                        }
+                    }}
+                    disabled={!p.inStock}
+                    className={`flex-1 py-3.5 rounded-2xl flex items-center justify-center gap-1.5 transition-all shadow-md font-black text-xs uppercase tracking-wider ${
+                        !p.inStock 
+                        ? 'bg-slate-100 text-slate-300 cursor-not-allowed shadow-none'
+                        : added === 'optional' 
+                        ? 'bg-pink-600 text-white shadow-pink-100' 
+                        : 'bg-pink-100 hover:bg-pink-200 text-pink-700 border border-pink-300 active:scale-[0.98]'
+                    }`}
+                >
+                    {added === 'optional' ? <CheckCircle2 size={15} /> : null}
+                    {p.inStock ? (added === 'optional' ? '¡Agregado!' : '🌸 Opcional') : 'Sin Stock'}
+                </button>
+              </div>
           </div>
 
           {/* External Link */}

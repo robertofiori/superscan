@@ -49,13 +49,17 @@ export const BANK_DISCOUNTS: BankDiscount[] = [
 
 export function getApplicableDiscount(supermarket: string, userBanks: string[]): BankDiscount | null {
   const today = new Date().getDay();
-  const lowerSM = supermarket.toLowerCase();
+  const normalizeStr = (str: string) => str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase() : "";
+  const lowerSM = normalizeStr(supermarket);
   
   // Find discounts that apply today to this supermarket and are in the user's banks
   const applicable = BANK_DISCOUNTS.filter(discount => 
     userBanks.includes(discount.id) &&
     discount.days.includes(today) &&
-    discount.supermarkets.some(sm => lowerSM.includes(sm))
+    discount.supermarkets.some(sm => {
+      const normSm = normalizeStr(sm);
+      return lowerSM.includes(normSm) || normSm.includes(lowerSM);
+    })
   );
 
   // Return the best one

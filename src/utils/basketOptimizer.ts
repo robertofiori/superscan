@@ -30,7 +30,7 @@ export const calculateOptimization = (items: ShoppingListItem[], userBanks: stri
   });
 
   const supermarketList = Array.from(allSupermarkets);
-  const currentTotal = items.reduce((sum, item) => sum + item.price.price * item.quantity, 0);
+  const currentTotal = items.reduce((sum, item) => item.isOptional ? sum : sum + item.price.price * item.quantity, 0);
   
   const totalsPerSupermarket: SupermarketTotal[] = supermarketList.map(sm => {
     let total = 0;
@@ -38,6 +38,8 @@ export const calculateOptimization = (items: ShoppingListItem[], userBanks: stri
     let missingItems = 0;
 
     items.forEach(item => {
+      if (item.isOptional) return; // OPCIONAL: no suma al costo total
+
       const priceInSm = item.allPrices?.find(p => p.supermarket === sm && p.inStock);
       
       if (priceInSm) {
@@ -61,7 +63,8 @@ export const calculateOptimization = (items: ShoppingListItem[], userBanks: stri
       }
     });
 
-    const matchPercentage = Math.round((itemCount / items.length) * 100);
+    const nonOptionalLength = items.filter(i => !i.isOptional).length || 1;
+    const matchPercentage = Math.round((itemCount / nonOptionalLength) * 100);
     const discountInfo = getApplicableDiscount(sm, userBanks);
     const effectiveTotal = discountInfo 
       ? total * (1 - discountInfo.discount)
@@ -83,6 +86,7 @@ export const calculateOptimization = (items: ShoppingListItem[], userBanks: stri
   totalsPerSupermarket.sort((a, b) => a.estimatedTotal - b.estimatedTotal);
 
   const theoreticalMin = items.reduce((sum, item) => {
+    if (item.isOptional) return sum;
     const validPrices = (item.allPrices || []).filter(p => p.inStock && p.price > 0);
     const bestPrice = validPrices.length > 0 
       ? Math.min(...validPrices.map(p => p.price), item.price.price)

@@ -38,7 +38,8 @@ function scoreProduct(productName: string, query: string): number {
 
 async function fetchVtex(storeName: string, domain: string, query: string, sc: number = 1) {
   try {
-    const searchUrl = `https://${domain}/api/catalog_system/pub/products/search?ft=${encodeURIComponent(query)}&sc=${sc}`;
+    const q = query.trim();
+    const searchUrl = `https://${domain}/api/catalog_system/pub/products/search?ft=${encodeURIComponent(q)}&sc=${sc}`;
     
     // Generar cookie de segmento idéntica a la del navegador para activar promociones
     const segmentObj = {

@@ -7,15 +7,17 @@ interface SidebarListProps {
   onRemoveItem: (id: string) => void;
   onClearList: () => void;
   onViewFullList: () => void;
+  onToggleOptional?: (id: string) => void;
 }
 
 export const SidebarList: React.FC<SidebarListProps> = ({ 
   items, 
   onRemoveItem, 
   onClearList,
-  onViewFullList 
+  onViewFullList,
+  onToggleOptional
 }) => {
-  const total = items.reduce((sum, item) => sum + (item.price.price * item.quantity), 0);
+  const total = items.reduce((sum, item) => item.isOptional ? sum : sum + (item.price.price * item.quantity), 0);
   const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
 
   return (
@@ -62,7 +64,11 @@ export const SidebarList: React.FC<SidebarListProps> = ({
             {items.map((item) => (
               <div 
                 key={item.id} 
-                className="group p-3 bg-white hover:bg-slate-50 rounded-2xl border border-slate-100 hover:border-slate-200 transition-all flex items-center gap-3 relative overflow-hidden"
+                className={`group p-3 rounded-2xl border transition-all flex items-center gap-3 relative overflow-hidden ${
+                  item.isOptional 
+                    ? 'bg-pink-50 border-pink-200 hover:border-pink-300' 
+                    : 'bg-white hover:bg-slate-50 border-slate-100 hover:border-slate-200'
+                }`}
               >
                 <div className="relative w-12 h-12 flex-shrink-0">
                   <img 
@@ -70,19 +76,42 @@ export const SidebarList: React.FC<SidebarListProps> = ({
                     alt={item.price.productName || item.product.product_name} 
                     className="w-full h-full object-contain mix-blend-multiply"
                   />
-                  <div className="absolute -top-1 -right-1 w-5 h-5 bg-primary-green text-white text-[10px] font-black rounded-full flex items-center justify-center border-2 border-white shadow-sm">
+                  <div className={`absolute -top-1 -right-1 w-5 h-5 text-white text-[10px] font-black rounded-full flex items-center justify-center border-2 border-white shadow-sm ${
+                    item.isOptional ? 'bg-pink-500' : 'bg-primary-green'
+                  }`}>
                     {item.quantity}
                   </div>
                 </div>
                 
                 <div className="flex-1 min-w-0">
-                  <h4 className="font-bold text-slate-700 text-xs line-clamp-1 leading-tight mb-0.5">
-                    {item.price.productName || item.product.product_name}
-                  </h4>
+                  <div className="flex items-center justify-between gap-1 mb-0.5">
+                    <h4 className="font-bold text-slate-700 text-xs line-clamp-1 leading-tight flex-1">
+                      {item.price.productName || item.product.product_name}
+                    </h4>
+                    {onToggleOptional && (
+                      <button
+                        type="button"
+                        onClick={() => onToggleOptional(item.id)}
+                        className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider transition-all shrink-0 ${
+                          item.isOptional 
+                            ? 'bg-emerald-600 hover:bg-emerald-700 text-white' 
+                            : 'bg-pink-100 hover:bg-pink-200 text-pink-700 border border-pink-300'
+                        }`}
+                      >
+                        {item.isOptional ? 'Principal' : '🌸 Opcional'}
+                      </button>
+                    )}
+                  </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-fuchsia-600 font-black text-sm">
-                      ${Math.round(item.price.price * item.quantity).toLocaleString('es-AR')}
-                    </span>
+                    {item.isOptional ? (
+                      <span className="text-pink-600 font-black text-xs line-through opacity-80">
+                        ${Math.round(item.price.price * item.quantity).toLocaleString('es-AR')}
+                      </span>
+                    ) : (
+                      <span className="text-fuchsia-600 font-black text-sm">
+                        ${Math.round(item.price.price * item.quantity).toLocaleString('es-AR')}
+                      </span>
+                    )}
                     <span className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">
                       @ {item.price.supermarket}
                     </span>

@@ -8,7 +8,7 @@ import ProductQuantitySelector from './ProductQuantitySelector';
 interface ProductResultProps {
   product: ProductData;
   prices: SupermarketPrice[];
-  onAddToList: (product: ProductData, bestPrice: SupermarketPrice, quantity: number) => void;
+  onAddToList: (product: ProductData, bestPrice: SupermarketPrice, quantity: number, isOptional?: boolean) => void;
   onScanAnother: () => void;
 }
 
@@ -18,7 +18,7 @@ function PriceRow({ p, product, isBest, bestValueItemId, userData, onAddToList, 
   isBest: boolean, 
   bestValueItemId?: string, 
   userData: any, 
-  onAddToList: (prod: ProductData, price: SupermarketPrice, qty: number) => void,
+  onAddToList: (prod: ProductData, price: SupermarketPrice, qty: number, isOptional?: boolean) => void,
   queryName: string
 }) {
   const [quantity, setQuantity] = useState(1);
@@ -68,7 +68,7 @@ function PriceRow({ p, product, isBest, bestValueItemId, userData, onAddToList, 
         </div>
       </div>
       
-      <div className="flex flex-col items-end gap-1.5 shrink-0 min-w-[110px]">
+      <div className="flex flex-col items-end gap-1.5 shrink-0 min-w-[120px]">
         {p.price > 0 ? (
           <>
             {p.isOffer && p.originalPrice ? (
@@ -106,21 +106,32 @@ function PriceRow({ p, product, isBest, bestValueItemId, userData, onAddToList, 
             )}
             
             {p.inStock && (
-              <div className="flex flex-col gap-2 mt-2 w-full">
+              <div className="flex flex-col gap-1.5 mt-2 w-full">
                 <ProductQuantitySelector quantity={quantity} onUpdate={setQuantity} />
-                <button 
-                  onClick={() => {
-                    onAddToList(product, p, quantity);
-                    setQuantity(1);
-                  }} 
-                  className={`text-[11px] font-black py-2.5 px-3 rounded-xl transition-all uppercase tracking-wider w-full flex items-center justify-center gap-1.5 ${
-                    isBest 
-                    ? 'bg-primary hover:bg-violet-600 text-white shadow-md shadow-primary/20' 
-                    : 'bg-slate-900 dark:bg-slate-100 hover:bg-black dark:hover:bg-white text-white dark:text-slate-900 shadow-sm'
-                  }`}
-                >
-                  <Plus size={14} /> Agregar
-                </button>
+                <div className="flex gap-1.5 w-full">
+                  <button 
+                    onClick={() => {
+                      onAddToList(product, p, quantity, false);
+                      setQuantity(1);
+                    }} 
+                    className={`text-[11px] font-black py-2 px-2 rounded-xl transition-all uppercase tracking-wider flex-1 flex items-center justify-center gap-1 ${
+                      isBest 
+                      ? 'bg-primary hover:bg-violet-600 text-white shadow-md shadow-primary/20' 
+                      : 'bg-slate-900 dark:bg-slate-100 hover:bg-black dark:hover:bg-white text-white dark:text-slate-900 shadow-sm'
+                    }`}
+                  >
+                    <Plus size={13} /> Agregar
+                  </button>
+                  <button 
+                    onClick={() => {
+                      onAddToList(product, p, quantity, true);
+                      setQuantity(1);
+                    }} 
+                    className="text-[11px] font-black py-2 px-2 rounded-xl transition-all uppercase tracking-wider flex-1 flex items-center justify-center gap-1 bg-pink-100 hover:bg-pink-200 text-pink-700 dark:bg-pink-950/60 dark:hover:bg-pink-900 dark:text-pink-300 border border-pink-300 dark:border-pink-800 shadow-sm"
+                  >
+                    🌸 Opcional
+                  </button>
+                </div>
               </div>
             )}
             

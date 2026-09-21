@@ -122,10 +122,14 @@ export async function getSupermarketPrices(query: string, location?: LocationDat
 
     const city = location?.city?.toLowerCase() || '';
     if (city.includes('bahia blanca')) {
-      const allowed = ['vea', 'carrefour', 'chango mas', 'cooperativa obrera', 'la coope'];
-      validPrices = validPrices.filter(p => 
-        allowed.some(a => p.supermarket?.toLowerCase().includes(a))
-      );
+      const allowed = ['vea', 'carrefour', 'chango mas', 'chango más', 'changomas', 'masonline', 'cooperativa obrera', 'la coope'];
+      const normalizeStr = (str: string) => str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase() : "";
+      const allowedNormalized = allowed.map(normalizeStr);
+      validPrices = validPrices.filter(p => {
+        if (!p.supermarket) return false;
+        const normSM = normalizeStr(p.supermarket);
+        return allowedNormalized.some(a => normSM.includes(a));
+      });
     }
 
 
@@ -222,4 +226,5 @@ export interface ShoppingListItem {
   allPrices: SupermarketPrice[];
   quantity: number;
   checked: boolean;
+  isOptional?: boolean;
 }

@@ -6,12 +6,12 @@ import { getApplicableDiscount } from '../data/bankDiscounts';
 import ProductQuantitySelector from './ProductQuantitySelector';
 
 interface OffersViewProps {
-  onAddToList: (product: ProductData, bestPrice: SupermarketPrice, allPrices: SupermarketPrice[], quantity: number) => void;
+  onAddToList: (product: ProductData, bestPrice: SupermarketPrice, allPrices: SupermarketPrice[], quantity: number, isOptional?: boolean) => void;
 }
 
-function OfferCard({ offer, onAdd, paymentMethods }: { offer: SupermarketPrice, onAdd: (qty: number) => void, paymentMethods: string[] }) {
+function OfferCard({ offer, onAdd, paymentMethods }: { offer: SupermarketPrice, onAdd: (qty: number, isOptional?: boolean) => void, paymentMethods: string[] }) {
   const [quantity, setQuantity] = useState(1);
-  const [added, setAdded] = useState(false);
+  const [added, setAdded] = useState<'main' | 'optional' | false>(false);
   const discountInfo = getApplicableDiscount(offer.supermarket, paymentMethods);
   const effectivePrice = discountInfo 
     ? offer.price * (1 - discountInfo.discount)
@@ -76,23 +76,40 @@ function OfferCard({ offer, onAdd, paymentMethods }: { offer: SupermarketPrice, 
             </div>
           )}
 
-          {/* Quantity Selector & Add Button */}
+          {/* Quantity Selector & Add / Optional Buttons */}
           <div className="flex flex-col gap-2 pt-2">
             <ProductQuantitySelector quantity={quantity} onUpdate={setQuantity} />
-            <button 
-              onClick={() => {
-                onAdd(quantity);
-                setAdded(true);
-                setTimeout(() => setAdded(false), 2000);
-                setQuantity(1);
-              }}
-              className={`w-full flex items-center justify-center gap-2 py-4 rounded-2xl text-[12px] font-black active:scale-[0.97] transition-all shadow-lg uppercase tracking-widest ${
-                added ? 'bg-emerald-500 text-white' : 'bg-primary-green text-white hover:bg-green-600'
-              }`}
-            >
-              {added ? <CheckCircle2 size={16} /> : null}
-              {added ? '¡Agregado!' : 'Agregar'}
-            </button>
+            <div className="flex gap-2">
+              <button 
+                onClick={() => {
+                  onAdd(quantity, false);
+                  setAdded('main');
+                  setTimeout(() => setAdded(false), 2000);
+                  setQuantity(1);
+                }}
+                className={`flex-1 flex items-center justify-center gap-1 py-3 rounded-2xl text-[11px] font-black active:scale-[0.97] transition-all shadow-md uppercase tracking-wider ${
+                  added === 'main' ? 'bg-emerald-500 text-white' : 'bg-primary-green text-white hover:bg-green-600'
+                }`}
+              >
+                {added === 'main' ? <CheckCircle2 size={14} /> : null}
+                {added === 'main' ? '¡Agregado!' : 'Agregar'}
+              </button>
+
+              <button 
+                onClick={() => {
+                  onAdd(quantity, true);
+                  setAdded('optional');
+                  setTimeout(() => setAdded(false), 2000);
+                  setQuantity(1);
+                }}
+                className={`flex-1 flex items-center justify-center gap-1 py-3 rounded-2xl text-[11px] font-black active:scale-[0.97] transition-all shadow-md uppercase tracking-wider ${
+                  added === 'optional' ? 'bg-pink-600 text-white' : 'bg-pink-100 hover:bg-pink-200 text-pink-700 border border-pink-300'
+                }`}
+              >
+                {added === 'optional' ? <CheckCircle2 size={14} /> : null}
+                {added === 'optional' ? '¡Agregado!' : '🌸 Opcional'}
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -128,7 +145,7 @@ export default function OffersView({ onAddToList }: OffersViewProps) {
     return () => { active = false; };
   }, [userData?.location]);
 
-  const handleAdd = (priceItem: SupermarketPrice, quantity: number) => {
+  const handleAdd = (priceItem: SupermarketPrice, quantity: number, isOptional?: boolean) => {
     // Buscar precios del mismo producto en otras tiendas dentro de las ofertas actuales
     const relevantPrices = offers.filter(o => 
       o.brand?.toLowerCase() === priceItem.brand?.toLowerCase() &&
@@ -147,7 +164,7 @@ export default function OffersView({ onAddToList }: OffersViewProps) {
       relevantPrices.push(priceItem);
     }
 
-    onAddToList(prod, priceItem, relevantPrices, quantity);
+    onAddToList(prod, priceItem, relevantPrices, quantity, isOptional);
   };
 
   if (loading) {

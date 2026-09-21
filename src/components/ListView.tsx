@@ -26,6 +26,7 @@ interface ListViewProps {
   onRenameNamedList: (listId: string, newName: string) => Promise<void>;
   onLoadNamedList: (list: SavedList) => void;
   onUnlinkActiveList?: () => void;
+  onToggleOptional?: (id: string) => void;
 }
 
 const ListView: React.FC<ListViewProps> = ({ 
@@ -40,7 +41,8 @@ const ListView: React.FC<ListViewProps> = ({
   onDeleteNamedList,
   onRenameNamedList,
   onLoadNamedList,
-  onUnlinkActiveList
+  onUnlinkActiveList,
+  onToggleOptional
 }) => {
   const { userData } = useAuth();
   const [showSaveModal, setShowSaveModal] = useState(false);
@@ -86,8 +88,8 @@ const ListView: React.FC<ListViewProps> = ({
     return acc;
   }, {} as Record<string, ShoppingListItem[]>);
 
-  const total = filteredItems.reduce((sum, item) => sum + item.price.price * item.quantity, 0);
-  const potentialSavings = total - optimization.theoreticalMin;
+  const total = filteredItems.reduce((sum, item) => item.isOptional ? sum : sum + item.price.price * item.quantity, 0);
+  const potentialSavings = Math.max(0, total - optimization.theoreticalMin);
 
   const handleWhatsAppExport = () => {
     let message = "*Mi Lista de Compras en ElMango 🥭*\n\n";
@@ -96,10 +98,14 @@ const ListView: React.FC<ListViewProps> = ({
       let storeTotal = 0;
       storeItems.forEach(it => {
         const itemTotal = it.price.price * it.quantity;
-        storeTotal += itemTotal;
-        message += `• ${it.quantity}x ${it.price.productName || it.product.product_name} - $${itemTotal.toLocaleString('es-AR')}\n`;
+        if (!it.isOptional) {
+          storeTotal += itemTotal;
+          message += `• ${it.quantity}x ${it.price.productName || it.product.product_name} - $${itemTotal.toLocaleString('es-AR')}\n`;
+        } else {
+          message += `• 🌸 [OPCIONAL] ${it.quantity}x ${it.price.productName || it.product.product_name} - $${itemTotal.toLocaleString('es-AR')} (No suma al total)\n`;
+        }
       });
-      message += `Subtotal: *$${storeTotal.toLocaleString('es-AR')}*\n\n`;
+      message += `Subtotal Principal: *$${storeTotal.toLocaleString('es-AR')}*\n\n`;
     });
     message += `💰 *Total General: $${total.toLocaleString('es-AR')}*\n`;
     message += `✨ *Ahorro Total Posible: $${potentialSavings.toLocaleString('es-AR')}*`;
@@ -136,14 +142,18 @@ const ListView: React.FC<ListViewProps> = ({
       currentY += 5;
 
       const storeTableData = storeItems.map(item => [
-        String(item.price.productName || item.product.product_name || 'Producto'),
+        item.isOptional 
+          ? `[OPCIONAL] ${item.price.productName || item.product.product_name || 'Producto'}` 
+          : String(item.price.productName || item.product.product_name || 'Producto'),
         String(item.quantity || 1),
         `$${(item.price.price || 0).toLocaleString('es-AR')}`,
         String(item.price.supermarket || 'Distribuidora'),
-        `$${((item.price.price || 0) * (item.quantity || 1)).toLocaleString('es-AR')}`
+        item.isOptional 
+          ? '$0 (Opcional)' 
+          : `$${((item.price.price || 0) * (item.quantity || 1)).toLocaleString('es-AR')}`
       ]);
 
-      const storeTotal = storeItems.reduce((sum, item) => sum + item.price.price * item.quantity, 0);
+      const storeTotal = storeItems.reduce((sum, item) => item.isOptional ? sum : sum + item.price.price * item.quantity, 0);
 
       autoTable(doc, {
         startY: currentY,
@@ -266,7 +276,7 @@ const ListView: React.FC<ListViewProps> = ({
                     </div>
                     <div>
                         <span className="text-3xl font-black">${total.toLocaleString('es-AR')}</span>
-                        <p className="text-xs font-bold text-slate-400 mt-1">Total actual de tu canasta</p>
+                        <p className="text-xs font-bold text-slate-400 mt-1">Total actual de productos principales (opcionales no suman)</p>
                     </div>
                     
                     {potentialSavings > 0 && (
@@ -313,11 +323,11 @@ const ListView: React.FC<ListViewProps> = ({
                             <span className="text-xl font-black text-slate-800">${sm.total.toLocaleString('es-AR')}</span>
                             <div className="flex items-center justify-between mt-2">
                                 <span className="text-[10px] font-bold text-slate-500 italic">
-                                    {sm.itemCount} de {items.length} productos
+                                    {sm.itemCount} de {items.filter(i => !i.isOptional).length} principales
                                 </span>
                                 {sm.savingsVsCurrent > 0 && (
                                     <span className="text-[10px] font-black text-primary-green italic">
-                                        -{((sm.savingsVsCurrent / total) * 100).toFixed(0)}% OFF
+                                        -{((sm.savingsVsCurrent / (total || 1)) * 100).toFixed(0)}% OFF
                                     </span>
                                 )}
                             </div>
@@ -368,12 +378,9 @@ const ListView: React.FC<ListViewProps> = ({
                       const discB = getApplicableDiscount(b.supermarket, userData?.paymentMethods || []);
                       const effA = discA ? a.price * (1 - discA.discount) : a.price;
                       const effB = discB ? b.price * (1 - discB.discount) : b.price;
-                      
-                      // Priority: effective price
                       return effA - effB;
                     })[0];
                   
-                  // Only suggest if it's actually better
                   const discountNow = getApplicableDiscount(item.price.supermarket, userData?.paymentMethods || []);
                   const effectiveNow = discountNow ? item.price.price * (1 - discountNow.discount) : item.price.price;
                   
@@ -388,100 +395,145 @@ const ListView: React.FC<ListViewProps> = ({
                       onClick={() => {
                         if (isChanguitoMode) toggleCheckItem(item.id);
                       }}
-                      className={`bg-white rounded-2xl p-4 shadow-sm border flex gap-4 items-center relative transition-all ${
+                      className={`rounded-2xl p-4 shadow-sm border flex flex-col gap-2 relative transition-all ${
                         isChanguitoMode ? 'cursor-pointer select-none' : ''
                       } ${
-                        isChecked ? 'bg-slate-50 border-emerald-200/60 opacity-60' : 'border-slate-100'
+                        item.isOptional 
+                          ? 'bg-pink-50/90 border-pink-300 dark:bg-pink-950/30 dark:border-pink-800'
+                          : isChecked ? 'bg-slate-50 border-emerald-200/60 opacity-60' : 'bg-white border-slate-100'
                       }`}
                     >
-                      {/* Checkbox en Modo Changuito */}
-                      {isChanguitoMode && (
-                        <div className="shrink-0">
-                          {isChecked ? (
-                            <CheckCircle2 size={24} className="text-primary-green fill-primary-green/10" />
-                          ) : (
-                            <Circle size={24} className="text-slate-300" />
-                          )}
-                        </div>
-                      )}
-
-                      <div className="w-12 h-12 shrink-0 bg-white rounded-xl overflow-hidden p-2 flex items-center justify-center relative group">
-                          <img src={item.price.imageUrl} alt={item.price.productName} className="w-full h-full object-contain" />
-                          {item.price.url && (
-                            <a 
-                              href={item.price.url} 
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                              className="absolute inset-0 bg-black/5 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity"
-                            >
-                              <ExternalLink size={14} className="text-white drop-shadow-md" />
-                            </a>
-                          )}
+                      {/* Status & Optional Toggle Bar */}
+                      <div className={`flex items-center justify-between px-3 py-1.5 rounded-xl text-xs font-bold transition-colors ${
+                        item.isOptional 
+                          ? 'bg-pink-100 dark:bg-pink-900/50 text-pink-700 dark:text-pink-300 border border-pink-200 dark:border-pink-800' 
+                          : 'bg-slate-100 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 border border-slate-200/60 dark:border-slate-700/60'
+                      }`}>
+                        <span className="flex items-center gap-1.5 text-[10px] sm:text-[11px] font-black">
+                          {item.isOptional ? '🌸 OPCIONAL (Segunda Opción)' : '📌 PRINCIPAL'}
+                        </span>
+                        {onToggleOptional && (
+                          <button 
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onToggleOptional(item.id);
+                            }}
+                            className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all shadow-xs active:scale-95 ${
+                              item.isOptional 
+                                ? 'bg-emerald-600 hover:bg-emerald-700 text-white' 
+                                : 'bg-pink-600 hover:bg-pink-700 text-white'
+                            }`}
+                          >
+                            {item.isOptional ? 'Hacer Principal' : 'Hacer Opcional'}
+                          </button>
+                        )}
                       </div>
-                      <div className="flex flex-col flex-1 min-w-0">
-                        <h4 className={`font-bold text-sm line-clamp-1 leading-tight flex items-center gap-1 ${
-                          isChecked ? 'line-through text-slate-400' : 'text-slate-800'
-                        }`}>
-                          {item.price.productName || item.product.product_name}
-                        </h4>
-                        <div className="flex items-center justify-between">
-                          <div className="flex flex-col">
-                            <span className="text-xs text-primary-green font-black mt-0.5">
-                              ${(item.price.price * item.quantity).toLocaleString('es-AR')}
-                            </span>
-                            {item.price.pricePerUnit && item.price.unitType && (
-                              <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-black flex items-center gap-1 mt-0.5">
-                                ⚖️ ${item.price.pricePerUnit.toLocaleString('es-AR', {maximumFractionDigits: 0})} / {item.price.unitType}
-                              </span>
-                            )}
-                            {/* Bank Discount Info */}
-                            {discountNow && (
-                              <div className="mt-1 flex items-center gap-1.5 bg-primary-green/5 px-2 py-0.5 rounded-lg border border-primary-green/10 self-start">
-                                <span className="text-[9px] font-black text-primary-green uppercase">{discountNow.name} -{(discountNow.discount * 100).toFixed(0)}%</span>
-                                <span className="text-xs font-black text-slate-800">${effectiveNow.toLocaleString('es-AR')}</span>
-                              </div>
+
+                      <div className="flex gap-4 items-center w-full">
+                        {/* Checkbox en Modo Changuito */}
+                        {isChanguitoMode && (
+                          <div className="shrink-0">
+                            {isChecked ? (
+                              <CheckCircle2 size={24} className="text-primary-green fill-primary-green/10" />
+                            ) : (
+                              <Circle size={24} className="text-slate-300" />
                             )}
                           </div>
-                          {item.price.url && (
-                              <a 
-                                  href={item.price.url} 
-                                  target="_blank" 
-                                  rel="noopener noreferrer"
-                                  className="text-[9px] font-bold text-slate-400 hover:text-primary-orange flex items-center gap-0.5"
-                              >
-                                  <ExternalLink size={8} /> Tienda
-                              </a>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex items-center bg-slate-100 rounded-xl px-1 py-1">
-                        <button 
-                           onClick={() => onUpdateQuantity(item.id, -1)}
-                           className="w-11 h-11 flex items-center justify-center text-slate-500 active:bg-slate-200 rounded-lg transition-colors"
-                        >
-                          <Minus size={20} />
-                        </button>
-                        <span className="px-2 font-black text-sm w-8 text-center">{item.quantity}</span>
-                        <button 
-                           onClick={() => onUpdateQuantity(item.id, 1)}
-                           disabled={item.quantity >= 20}
-                           className={`w-11 h-11 flex items-center justify-center rounded-lg transition-colors ${item.quantity >= 20 ? 'text-slate-200 cursor-not-allowed' : 'text-primary-green active:bg-green-100 hover:bg-slate-50'}`}
-                        >
-                          <Plus size={20} />
-                        </button>
-                      </div>
+                        )}
 
-                      {isBetter && (
-                        <button 
-                          onClick={() => onUpdatePrice(item.id, betterPrice)}
-                          className="absolute -top-2 right-4 bg-emerald-500 text-white px-3 py-1.5 rounded-full text-[9px] font-black shadow-lg border-2 border-white flex items-center gap-2 active:scale-95 transition-transform"
-                        >
-                          <TrendingDown size={12} /> 
-                          {betterPrice.pricePerUnit && item.price.pricePerUnit && betterPrice.pricePerUnit < item.price.pricePerUnit 
-                            ? `¡RINDE MÁS POR $${betterPrice.price}!` 
-                            : `MÁS BARATO ($${betterPrice.price})`}
-                        </button>
-                      )}
+                        <div className="w-12 h-12 shrink-0 bg-white rounded-xl overflow-hidden p-2 flex items-center justify-center relative group shadow-sm border border-slate-100">
+                            <img src={item.price.imageUrl} alt={item.price.productName} className="w-full h-full object-contain" />
+                            {item.price.url && (
+                              <a 
+                                href={item.price.url} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="absolute inset-0 bg-black/5 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity"
+                              >
+                                <ExternalLink size={14} className="text-white drop-shadow-md" />
+                              </a>
+                            )}
+                        </div>
+                        <div className="flex flex-col flex-1 min-w-0">
+                          <h4 className={`font-bold text-sm line-clamp-1 leading-tight flex items-center gap-1 ${
+                            isChecked ? 'line-through text-slate-400' : item.isOptional ? 'text-pink-950 dark:text-pink-100 font-extrabold' : 'text-slate-800'
+                          }`}>
+                            {item.price.productName || item.product.product_name}
+                          </h4>
+                          <div className="flex items-center justify-between">
+                            <div className="flex flex-col">
+                              {item.isOptional ? (
+                                <div className="flex items-center gap-1.5 mt-0.5">
+                                  <span className="text-xs text-pink-600 font-black line-through opacity-75">
+                                    ${(item.price.price * item.quantity).toLocaleString('es-AR')}
+                                  </span>
+                                  <span className="text-[10px] bg-pink-200 text-pink-800 font-black px-1.5 py-0.5 rounded shadow-sm">
+                                    $0 al total
+                                  </span>
+                                </div>
+                              ) : (
+                                <span className="text-xs text-primary-green font-black mt-0.5">
+                                  ${(item.price.price * item.quantity).toLocaleString('es-AR')}
+                                </span>
+                              )}
+
+                              {item.price.pricePerUnit && item.price.unitType && (
+                                <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-black flex items-center gap-1 mt-0.5">
+                                  ⚖️ ${item.price.pricePerUnit.toLocaleString('es-AR', {maximumFractionDigits: 0})} / {item.price.unitType}
+                                </span>
+                              )}
+                              
+                              {/* Bank Discount Info */}
+                              {discountNow && (
+                                <div className="mt-1 flex items-center gap-1.5 bg-primary-green/5 px-2 py-0.5 rounded-lg border border-primary-green/10 self-start">
+                                  <span className="text-[9px] font-black text-primary-green uppercase">{discountNow.name} -{(discountNow.discount * 100).toFixed(0)}%</span>
+                                  <span className="text-xs font-black text-slate-800">${effectiveNow.toLocaleString('es-AR')}</span>
+                                </div>
+                              )}
+                            </div>
+
+                            {item.price.url && (
+                                <a 
+                                    href={item.price.url} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    className="text-[9px] font-bold text-slate-400 hover:text-primary-orange flex items-center gap-0.5"
+                                >
+                                    <ExternalLink size={8} /> Tienda
+                                </a>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center bg-slate-100 rounded-xl px-1 py-1">
+                          <button 
+                             onClick={() => onUpdateQuantity(item.id, -1)}
+                             className="w-11 h-11 flex items-center justify-center text-slate-500 active:bg-slate-200 rounded-lg transition-colors"
+                          >
+                            <Minus size={20} />
+                          </button>
+                          <span className="px-2 font-black text-sm w-8 text-center">{item.quantity}</span>
+                          <button 
+                             onClick={() => onUpdateQuantity(item.id, 1)}
+                             disabled={item.quantity >= 20}
+                             className={`w-11 h-11 flex items-center justify-center rounded-lg transition-colors ${item.quantity >= 20 ? 'text-slate-200 cursor-not-allowed' : 'text-primary-green active:bg-green-100 hover:bg-slate-50'}`}
+                          >
+                            <Plus size={20} />
+                          </button>
+                        </div>
+
+                        {isBetter && (
+                          <button 
+                            onClick={() => onUpdatePrice(item.id, betterPrice)}
+                            className="absolute -top-2 right-4 bg-emerald-500 text-white px-3 py-1.5 rounded-full text-[9px] font-black shadow-lg border-2 border-white flex items-center gap-2 active:scale-95 transition-transform"
+                          >
+                            <TrendingDown size={12} /> 
+                            {betterPrice.pricePerUnit && item.price.pricePerUnit && betterPrice.pricePerUnit < item.price.pricePerUnit 
+                              ? `¡RINDE MÁS POR $${betterPrice.price}!` 
+                              : `MÁS BARATO ($${betterPrice.price})`}
+                          </button>
+                        )}
+                      </div>
                     </div>
                   );
                 })}
