@@ -1,9 +1,16 @@
 import { useEffect, useState } from 'react';
 import { ShoppingBag, Sparkles, AlertCircle, CheckCircle2 } from 'lucide-react';
-import { fetchDailyOffers, type SupermarketPrice, type ProductData } from '../api';
+import { fetchDailyOffers, type SupermarketPrice, type ProductData, type LocationData } from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import { getApplicableDiscount } from '../data/bankDiscounts';
 import ProductQuantitySelector from './ProductQuantitySelector';
+
+const DEFAULT_LOCATION: LocationData = {
+  id: 'bhi',
+  city: 'Bahía Blanca',
+  province: 'Buenos Aires',
+  zipCode: '8000'
+};
 
 interface OffersViewProps {
   onAddToList: (product: ProductData, bestPrice: SupermarketPrice, allPrices: SupermarketPrice[], quantity: number, isOptional?: boolean) => void;
@@ -125,25 +132,29 @@ export default function OffersView({ onAddToList }: OffersViewProps) {
   useEffect(() => {
     let active = true;
     const loadOpts = async () => {
-      // Si no tenemos userData aún, no disparamos la carga de ofertas
-      // para evitar pedir el 'default' erróneamente
-      if (!userData?.location) return;
-
       setLoading(true);
-      const data = await fetchDailyOffers(userData.location);
-      if (active) {
-        const isDiaChain = (name: string) => {
-          if (!name) return false;
-          const normalized = name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-          return normalized.includes('dia');
-        };
-        setOffers(data.filter(o => !isDiaChain(o.supermarket)));
-        setLoading(false);
+      try {
+        const locationToUse = userData?.location || DEFAULT_LOCATION;
+        const data = await fetchDailyOffers(locationToUse);
+        if (active) {
+          const isDiaChain = (name: string) => {
+            if (!name) return false;
+            const normalized = name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+            return normalized.includes('dia');
+          };
+          setOffers(data.filter(o => !isDiaChain(o.supermarket)));
+        }
+      } catch (error) {
+        console.error("Error al cargar ofertas:", error);
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
       }
     };
     loadOpts();
     return () => { active = false; };
-  }, [userData?.location]);
+  }, [userData?.location?.id, userData?.location?.city]);
 
   const handleAdd = (priceItem: SupermarketPrice, quantity: number, isOptional?: boolean) => {
     // Buscar precios del mismo producto en otras tiendas dentro de las ofertas actuales
