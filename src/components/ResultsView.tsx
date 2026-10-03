@@ -2,6 +2,8 @@ import { useState, useMemo } from 'react';
 import { ShoppingBag, AlertCircle, Zap, ExternalLink, ArrowUpDown, CheckCircle2 } from 'lucide-react';
 import { type ProductData, type SupermarketPrice } from '../api';
 import ProductQuantitySelector from './ProductQuantitySelector';
+import { useLocation } from '../contexts/LocationContext';
+import { isStoreAllowedInZone } from '../data/zones';
 
 interface ResultsViewProps {
   product: ProductData;
@@ -198,15 +200,10 @@ const ResultsView: React.FC<ResultsViewProps> = ({ product, prices, onAddToList,
     return Array.from(brandsSet);
   }, [prices]);
 
-  const processedPrices = useMemo(() => {
-    // Robust check for DIA chain matches api.ts
-    const isDiaChain = (name: string) => {
-      if (!name) return false;
-      const normalized = name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-      return normalized.includes('dia');
-    };
+  const { currentZone } = useLocation();
 
-    let result = prices.filter(p => !isDiaChain(p.supermarket));
+  const processedPrices = useMemo(() => {
+    let result = prices.filter(p => isStoreAllowedInZone(p.supermarket, currentZone.id));
 
     // Filter by offers if enabled
     if (showOnlyOffers) {

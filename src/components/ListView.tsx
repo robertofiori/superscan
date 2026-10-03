@@ -226,9 +226,17 @@ const ListView: React.FC<ListViewProps> = ({
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-black text-slate-800">Mi Lista</h2>
         {items.length > 0 && (
-          <button onClick={onClear} className="text-red-500 font-bold text-sm flex items-center gap-1">
-            <Trash2 size={16} /> Vaciar
-          </button>
+          <>
+            <button
+              onClick={() => setShowSaveModal(true)}
+              className="bg-primary-green hover:bg-emerald-600 text-white font-bold py-2 px-4 rounded mr-2"
+            >
+              Guardar Lista
+            </button>
+            <button onClick={onClear} className="text-red-500 font-bold text-sm flex items-center gap-1">
+              <Trash2 size={16} /> Vaciar
+            </button>
+          </>
         )}
       </div>
 

@@ -3,8 +3,9 @@ import {
   ShoppingBag, MapPin, Plus, Minus, 
   ShoppingBasket, Store
 } from 'lucide-react';
-import AutocompleteSearch from './AutocompleteSearch';
 import { useAuth } from '../contexts/AuthContext';
+import { useLocation } from '../contexts/LocationContext';
+import { ZoneSelector } from './ZoneSelector';
 import { type ShoppingListItem } from '../api';
 import { db } from '../firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
@@ -73,8 +74,9 @@ const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: numbe
   return R * c; 
 };
 
-const HomeView: React.FC<HomeViewProps> = ({ onSearch, onViewChange, onShowLocation, items, onUpdateQuantity, onToggleOptional }) => {
-  const { user, userData } = useAuth();
+const HomeView: React.FC<HomeViewProps> = ({ onSearch: _onSearch, onViewChange, items, onUpdateQuantity, onToggleOptional }) => {
+  const { user } = useAuth();
+  const { currentZone } = useLocation();
   const [stores, setStores] = React.useState<any[]>([]);
   const [locationStatus, setLocationStatus] = React.useState<'idle' | 'loading' | 'success' | 'error' | 'no_stores'>('idle');
 
@@ -173,34 +175,14 @@ const HomeView: React.FC<HomeViewProps> = ({ onSearch, onViewChange, onShowLocat
             </div>
           </div>
 
-          <div className="flex flex-col w-full relative mb-12 items-start pl-4 2xl:pl-8">
+          <div className="flex flex-col w-full relative mb-8 items-start pl-4 2xl:pl-8">
             <span className="text-[72px] xl:text-[88px] 2xl:text-[100px] leading-[0.85] tracking-tighter text-primary-green font-black italic relative z-20" style={{ fontFamily: "'Montserrat', sans-serif" }}>
               realmente<span className="text-slate-950">!</span>
             </span>
           </div>
 
-          <div className="w-full max-w-xl 2xl:max-w-2xl relative z-30">
-             <AutocompleteSearch onSearch={onSearch} />
-          </div>
-          
-          <div className="mt-6">
-            <button 
-              onClick={onShowLocation}
-              className="flex items-center gap-3 px-6 py-3.5 bg-white hover:bg-slate-50 rounded-2xl border border-slate-200 active:scale-[0.98] transition-all shadow-sm group"
-            >
-              <div className="w-8 h-8 bg-slate-50 group-hover:bg-white text-primary-green rounded-xl flex items-center justify-center shadow-sm">
-                <MapPin size={18} />
-              </div>
-              <div className="flex flex-col items-start leading-tight">
-                <span className="text-[9px] text-slate-400 font-black uppercase tracking-widest">Ubicación Actual</span>
-                <span className="text-sm font-black text-slate-800 line-clamp-1">
-                  {userData?.location?.city || 'Seleccionar Ciudad'}
-                </span>
-              </div>
-              <div className="ml-4 bg-slate-50 px-3 py-1.5 rounded-xl text-[10px] font-black text-primary-green hover:bg-primary-green hover:text-white border border-slate-100 uppercase tracking-wider transition-colors">
-                CAMBIAR
-              </div>
-            </button>
+          <div className="w-full max-w-xl 2xl:max-w-2xl">
+            <ZoneSelector variant="hero" />
           </div>
         </div>
 
@@ -247,35 +229,14 @@ const HomeView: React.FC<HomeViewProps> = ({ onSearch, onViewChange, onShowLocat
             </div>
           </div>
 
-          <div className="flex flex-col w-full relative -mt-1 mb-8 items-center pl-2">
+          <div className="flex flex-col w-full relative -mt-1 mb-6 items-center pl-2">
             <span className="text-[52px] min-[400px]:text-[64px] leading-[0.85] tracking-tighter text-primary-green font-black italic relative z-20" style={{ fontFamily: "'Montserrat', sans-serif" }}>
               realmente<span className="text-slate-950">!</span>
             </span>
           </div>
 
-          <div className="w-full max-w-[280px] mx-auto space-y-4">
-            <div className="relative z-30">
-              <AutocompleteSearch onSearch={onSearch} />
-            </div>
-            <button 
-              onClick={onShowLocation}
-              className="w-full flex items-center justify-between p-3.5 bg-slate-50 rounded-2xl border border-slate-100 active:scale-[0.98] transition-all"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 bg-white text-primary-green rounded-xl flex items-center justify-center shadow-sm">
-                  <MapPin size={18} />
-                </div>
-                <div className="flex flex-col items-start leading-tight">
-                  <span className="text-[9px] text-slate-400 font-black uppercase tracking-widest">Ubicación</span>
-                  <span className="text-sm font-black text-slate-800 line-clamp-1">
-                    {userData?.location?.city || 'Seleccionar Ciudad'}
-                  </span>
-                </div>
-              </div>
-              <div className="bg-white px-3 py-1.5 rounded-xl text-[10px] font-black text-primary-green border border-slate-100 uppercase tracking-wider">
-                CAMBIAR
-              </div>
-            </button>
+          <div className="w-full max-w-[320px] mx-auto">
+            <ZoneSelector variant="hero" />
           </div>
         </div>
       </section>
@@ -344,7 +305,7 @@ const HomeView: React.FC<HomeViewProps> = ({ onSearch, onViewChange, onShowLocat
             <div className="flex items-center justify-between mb-8">
                <div>
                   <h3 className="text-2xl font-black text-slate-800 tracking-tight">Sucursales Cercanas</h3>
-                  <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">Bahía Blanca</p>
+                  <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">{currentZone.name}</p>
                </div>
                <div className="p-3 bg-slate-50 text-slate-400 rounded-2xl">
                  <Store size={24} />

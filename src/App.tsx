@@ -4,6 +4,7 @@ import HomeView from './components/HomeView';
 import ResultsView from './components/ResultsView';
 import ListView from './components/ListView';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { LocationProvider, useLocation } from './contexts/LocationContext';
 import { fetchProductInfo, getSupermarketPrices, type ProductData, type SupermarketPrice, type ShoppingListItem } from './api';
 import { AlertCircle, RefreshCw } from 'lucide-react';
 import { LandingScreen, LoginScreen } from './components/AuthScreens';
@@ -69,6 +70,7 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
 
 const AppContent = () => {
   const { user, userData, loading: authLoading } = useAuth();
+  const { currentZone } = useLocation();
   const [showAuthScreen, setShowAuthScreen] = useState<'landing' | 'login'>('landing');
   const [activeView, setActiveView] = useState('home');
   const [scanning, setScanning] = useState(false);
@@ -209,7 +211,7 @@ const AppContent = () => {
 
       const [prodInfo, pricesData] = await Promise.all([
         isBarcode ? fetchProductInfo(lastScannedCode!) : Promise.resolve(null),
-        getSupermarketPrices(lastScannedCode!, userData?.location)
+        getSupermarketPrices(lastScannedCode!, userData?.location, currentZone.id)
       ]);
 
       if (!active) return;
@@ -227,9 +229,10 @@ const AppContent = () => {
     loadData();
 
     return () => { active = false; };
-  }, [lastScannedCode]);
+  }, [lastScannedCode, currentZone.id]);
 
   const handleSearch = (query: string) => {
+    setActiveView('results');
     setLastScannedCode(query);
   };
 
@@ -420,6 +423,8 @@ const AppContent = () => {
     <Layout 
       activeView={activeView} 
       onViewChange={handleViewChange} 
+      onSearch={handleSearch}
+      searchQuery={lastScannedCode || ''}
       cartCount={listItems.reduce((acc, item) => acc + item.quantity, 0)}
       onScan={() => setScanning(true)}
       showLocationModal={showLocationModal}
@@ -444,7 +449,9 @@ function App() {
   return (
     <ErrorBoundary>
       <AuthProvider>
-        <AppContent />
+        <LocationProvider>
+          <AppContent />
+        </LocationProvider>
       </AuthProvider>
     </ErrorBoundary>
   );

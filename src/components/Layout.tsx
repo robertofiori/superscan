@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import LocationModal from './LocationModal';
 import { type ShoppingListItem } from '../api';
 import { SidebarList } from './SidebarList';
+import AutocompleteSearch from './AutocompleteSearch';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -18,6 +19,8 @@ interface LayoutProps {
   onRemoveItem?: (id: string) => void;
   onClearList?: () => void;
   onToggleOptional?: (id: string) => void;
+  onSearch?: (query: string) => void;
+  searchQuery?: string;
 }
 
 const Layout: React.FC<LayoutProps> = ({ 
@@ -30,7 +33,9 @@ const Layout: React.FC<LayoutProps> = ({
   listItems = [],
   onRemoveItem = () => {},
   onClearList = () => {},
-  onToggleOptional
+  onToggleOptional,
+  onSearch = () => {},
+  searchQuery = ''
 }) => {
   const { user, userData } = useAuth();
   const avatarUrl = userData?.avatarUrl || user?.photoURL;
@@ -43,93 +48,31 @@ const Layout: React.FC<LayoutProps> = ({
   
   return (
     <div className="min-h-screen flex flex-col bg-background-soft text-text-dark font-sans relative">
+      {/* Top Header Bar with Sticky Search (Always visible on scroll across all tabs) */}
+      <header className="w-full bg-white/95 backdrop-blur-md border-b border-slate-100 px-4 sm:px-8 py-2.5 sticky top-0 z-40 flex items-center justify-center shadow-xs">
+        <div className="w-full max-w-2xl">
+          <AutocompleteSearch onSearch={onSearch} initialQuery={searchQuery} />
+        </div>
+      </header>
+
       {/* Toast de Notificación MUY PRONTO */}
       {showSoonToast && (
-        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[200] bg-amber-500 text-white font-black px-6 py-3 rounded-full shadow-2xl flex items-center gap-2 text-sm animate-in slide-in-from-top-4 duration-300 border-2 border-white">
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[200] bg-amber-500 text-white font-black px-6 py-3 rounded-full shadow-2xl flex items-center gap-2 text-sm animate-in slide-in-from-top-4 duration-300 border-2 border-white">
           <Sparkles size={18} />
           <span>¡MUY PRONTO! La función de escanear estará disponible próximamente.</span>
         </div>
       )}
 
-      {/* Top Navigation (Desktop Only) - Mobile Adaption */}
-      <div className="hidden lg:flex fixed top-8 left-1/2 -translate-x-1/2 z-50">
-        <nav className="w-[520px] h-18 bg-white/95 backdrop-blur-xl border border-slate-100 shadow-2xl flex items-center justify-around px-2 rounded-[32px]">
-          <NavItem
-            icon={
-              <div className="relative">
-                <ListOrdered size={24} />
-                {cartCount > 0 && (
-                  <span 
-                    key={cartCount}
-                    className="absolute -top-2 -right-2 bg-primary-green text-white text-[9px] font-black h-4 w-4 rounded-full flex items-center justify-center border border-white shadow-sm animate-in zoom-in duration-300"
-                  >
-                    {cartCount}
-                  </span>
-                )}
-              </div>
-            }
-            label="Lista"
-            isActive={activeView === 'list'}
-            onClick={() => onViewChange('list')}
-          />
-          <NavItem
-            icon={<Tag size={24} />}
-            label="Ofertas"
-            isActive={activeView === 'offers'}
-            onClick={() => onViewChange('offers')}
-          />
-          
-          {/* Central Highlighted Search Button */}
-          <div className="relative -mt-10 flex flex-col items-center">
-            <button
-              onClick={() => onViewChange('home')}
-              className={`w-16 h-16 rounded-full flex items-center justify-center shadow-xl transition-all duration-500 active:scale-90 border-[4px] border-white
-                ${activeView === 'home' || activeView === 'results'
-                  ? 'bg-slate-900 text-white scale-110 shadow-slate-200' 
-                  : 'bg-primary-green text-white hover:scale-105'}`}
-            >
-              <Search size={28} className={activeView === 'home' ? 'animate-pulse' : ''} />
-            </button>
-            <span className={`text-[9px] font-black uppercase tracking-[0.1em] mt-2 transition-all ${activeView === 'home' ? 'text-slate-900 opacity-100' : 'text-slate-400 opacity-80'}`}>BUSCAR</span>
-          </div>
-
-          <NavItem
-            icon={avatarUrl ? (
-              <img src={avatarUrl} alt="Perfil" className={`w-6 h-6 rounded-full object-cover shadow-sm ${activeView === 'profile' ? 'ring-2 ring-primary-green' : 'opacity-70'}`} />
-            ) : (
-              <User size={24} />
-            )}
-            label="Perfil"
-            isActive={activeView === 'profile'}
-            onClick={() => onViewChange('profile')}
-          />
-
-          <NavItem
-            icon={
-              <div className="relative flex flex-col items-center justify-center">
-                <span className="absolute -top-3 bg-amber-500 text-white text-[7px] font-black px-1.5 py-0.5 rounded-full shadow-sm tracking-wider uppercase whitespace-nowrap border border-white">
-                  MUY PRONTO
-                </span>
-                <Barcode size={24} className="opacity-50" />
-              </div>
-            }
-            label="Escanear"
-            isActive={false}
-            onClick={handleScanClick}
-          />
-        </nav>
-      </div>
-
       {/* Main Content Area */}
       <main className="flex-1 flex overflow-hidden bg-white">
         <div className="flex-1 overflow-y-auto custom-scrollbar">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 mb-24 lg:mb-0">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 mb-28">
             {children}
           </div>
         </div>
 
         {/* Desktop Sidebar - "Mi Lista" Summary */}
-        <aside className="hidden lg:block w-[380px] flex-shrink-0 sticky top-20 h-[calc(100vh-80px)] border-l border-slate-100 overflow-hidden bg-white">
+        <aside className="hidden lg:block w-[380px] flex-shrink-0 sticky top-16 h-[calc(100vh-64px)] border-l border-slate-100 overflow-hidden bg-white">
           <SidebarList 
             items={listItems}
             onRemoveItem={onRemoveItem}
@@ -142,8 +85,8 @@ const Layout: React.FC<LayoutProps> = ({
 
       {showLocationModal && <LocationModal onClose={onCloseLocation} />}
 
-      {/* Bottom Navigation (Mobile Only) - Professional Refresh */}
-      <nav className="lg:hidden fixed bottom-6 left-1/2 -translate-x-1/2 w-[92%] max-w-[420px] h-18 bg-white/95 backdrop-blur-xl border border-slate-100 shadow-2xl flex items-center justify-around px-2 z-50 rounded-[32px]">
+      {/* Floating Navigation Dock (Accessible on all views) */}
+      <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[92%] max-w-[480px] h-18 bg-white/95 backdrop-blur-xl border border-slate-100 shadow-2xl flex items-center justify-around px-2 z-50 rounded-[32px]">
           <NavItem
             icon={
               <div className="relative">

@@ -5,17 +5,24 @@ import { fetchSearchSuggestions, type ProductSuggestion } from '../api';
 interface AutocompleteSearchProps {
   onSearch: (query: string) => void;
   placeholder?: string;
+  initialQuery?: string;
 }
 
 const SEARCH_CACHE: Record<string, ProductSuggestion[]> = {};
 
-const AutocompleteSearch: React.FC<AutocompleteSearchProps> = ({ onSearch, placeholder }) => {
-  const [query, setQuery] = useState('');
+const AutocompleteSearch: React.FC<AutocompleteSearchProps> = ({ onSearch, placeholder, initialQuery = '' }) => {
+  const [query, setQuery] = useState(initialQuery);
   const [suggestions, setSuggestions] = useState<ProductSuggestion[]>([]);
   const [loading, setLoading] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (initialQuery !== undefined) {
+      setQuery(initialQuery);
+    }
+  }, [initialQuery]);
 
   useEffect(() => {
     const fetchSuggestions = async () => {

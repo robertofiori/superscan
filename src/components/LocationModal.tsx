@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { X, MapPin, Search, Navigation, Loader2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { useLocation } from '../contexts/LocationContext';
+import { findClosestZone } from '../data/zones';
 import { MapContainer, TileLayer, Marker, Popup, useMap, Circle } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
@@ -57,6 +59,7 @@ interface LocationModalProps {
 
 export default function LocationModal({ onClose }: LocationModalProps) {
   const { userData, updateUserData } = useAuth();
+  const { selectZone } = useLocation();
   
   // Posición por defecto: Bahía Blanca
   const defaultPos: [number, number] = [-38.7183, -62.2663];
@@ -168,6 +171,8 @@ export default function LocationModal({ onClose }: LocationModalProps) {
   };
 
   const handleSaveLocation = async () => {
+      const matchedZone = findClosestZone(center[0], center[1]);
+      selectZone(matchedZone.id);
       await updateUserData({
           location: {
               id: cityData.city.toLowerCase().replace(/\s+/g, '-'),
